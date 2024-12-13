@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
@@ -53,7 +54,11 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	if input != nil {
 		if errValidate := validate.Struct(input); errValidate != nil {
 			log.Warn().Err(err).Msg("Validation error")
-			huma.WriteErr(r.Api, ctx, 400, "Validation error", err)
+			vc.SetStatus(400)
+			vc.SetHeader("Content-Type", "application/json")
+			er := core.TechnicalErrorWithCodeAndMessage("VAL-ERR", errValidate.Error())
+			bitErrResposnse, _ := json.Marshal(er)
+			vc.BodyWriter().Write(bitErrResposnse)
 			return
 		}
 	}
