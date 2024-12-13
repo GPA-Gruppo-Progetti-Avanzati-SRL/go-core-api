@@ -7,6 +7,7 @@ import (
 )
 
 const ApplicationJson = "application/json"
+const ErrValidation = "ERR_VALIDATION"
 
 func ManageBusinessError(e *core.ApplicationError) error {
 
@@ -64,7 +65,7 @@ func ConfigureError() {
 		if status == 422 {
 			return &DefaultError{
 				Status:  400,
-				Code:    "ERR_VALIDATION",
+				Code:    ErrValidation,
 				Message: message + " " + errors.Join(errs...).Error(),
 			}
 		}

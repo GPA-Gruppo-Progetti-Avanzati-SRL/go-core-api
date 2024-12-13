@@ -38,15 +38,13 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	log.Info().Msgf("ValidatorHandler type: %+v", t)
 	input := reflect.New(t).Interface()
 	b, err := io.ReadAll(vc.BodyReader())
-
 	if err != nil {
-		log.Warn().Err(err).Msg("Validation Read error")
-		huma.WriteErr(r.Api, ctx, 400, "Validation Read error", err)
+		next(vc)
 		return
 	}
 	if berr := json.Unmarshal(b, input); berr != nil {
-		log.Warn().Err(berr).Msg("Validation Unmarshal error")
-		huma.WriteErr(r.Api, ctx, 400, "Validation Unmarshal error", berr)
+		next(vc)
+		return
 	}
 
 	log.Info().Msgf("ValidatorHandler Input: %+v", input)
@@ -56,7 +54,7 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 			log.Warn().Err(err).Msg("Validation error")
 			vc.SetStatus(400)
 			vc.SetHeader("Content-Type", "application/json")
-			er := core.TechnicalErrorWithCodeAndMessage("VAL-ERR", errValidate.Error())
+			er := core.TechnicalErrorWithCodeAndMessage(ErrValidation, errValidate.Error())
 			bitErrResposnse, _ := json.Marshal(er)
 			vc.BodyWriter().Write(bitErrResposnse)
 			return
