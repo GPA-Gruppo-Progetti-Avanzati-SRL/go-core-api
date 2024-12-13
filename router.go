@@ -23,6 +23,7 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 	r.Api = humachi.New(cm, config)
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(TracingHandler)
+	r.Api.UseMiddleware(r.ValidatorHandler)
 	ConfigureError()
 	return r
 }
