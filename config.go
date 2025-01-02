@@ -1,4 +1,4 @@
-package api
+package apiservices
 
 type Config struct {
 	Host       string `yaml:"host" mapstructure:"host" json:"host"`
