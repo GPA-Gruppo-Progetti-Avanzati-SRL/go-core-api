@@ -20,6 +20,15 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 	config.Components = &huma.Components{
 		Schemas: ApiRegistry,
 	}
+	var serverList []*huma.Server
+	for _, server := range cfg.Servers {
+		serverList = append(serverList, &huma.Server{
+			URL:         server.Url,
+			Description: server.Description,
+		})
+	}
+
+	config.Servers = serverList
 	r.Api = humachi.New(cm, config)
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(TracingHandler)
