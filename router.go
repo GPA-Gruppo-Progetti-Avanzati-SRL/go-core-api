@@ -16,6 +16,7 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 
 	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
 	config.SchemasPath = ""
+
 	config.OpenAPI.Components.Schemas = ApiRegistry
 	config.Components = &huma.Components{
 		Schemas: ApiRegistry,
@@ -27,6 +28,7 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 			Description: server.Description,
 		})
 	}
+	config.Info.Description = cfg.Description
 
 	config.Servers = serverList
 	r.Api = humachi.New(cm, config)
