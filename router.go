@@ -16,7 +16,7 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 
 	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
 	config.SchemasPath = ""
-
+	config.CreateHooks = nil
 	config.OpenAPI.Components.Schemas = ApiRegistry
 	config.Components = &huma.Components{
 		Schemas: ApiRegistry,
