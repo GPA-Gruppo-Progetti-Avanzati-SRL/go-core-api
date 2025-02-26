@@ -43,6 +43,7 @@ var ApiRegistry = huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchem
 
 var DefaultResponses = map[string]*huma.Response{
 	"400": {Ref: "", Description: "BadRequest/Validation Error", Content: ErrorContent, Links: nil, Extensions: nil},
+	"404": {Ref: "", Description: "Not Found", Content: nil, Links: nil, Extensions: nil},
 	"408": {Ref: "", Description: "Request Timeout", Content: nil, Links: nil, Extensions: nil},
 	"422": {Ref: "", Description: "KO Applicativo", Content: ErrorContent, Links: nil, Extensions: nil},
 	"500": {Ref: "", Description: "Internal Server Error", Content: ErrorContent, Links: nil, Extensions: nil},
