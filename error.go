@@ -67,6 +67,7 @@ func ConfigureError() {
 				Status:  400,
 				Code:    ErrValidation,
 				Message: message + " " + errors.Join(errs...).Error(),
+				Ambit:   "VALIDATION",
 			}
 		}
 		return orig(status, message, errs...)
