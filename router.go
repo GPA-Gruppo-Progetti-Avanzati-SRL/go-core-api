@@ -9,10 +9,13 @@ import (
 
 type Router struct {
 	Api huma.API
+	Mux *chi.Mux
 }
 
 func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
-	r := &Router{}
+	r := &Router{
+		Mux: cm,
+	}
 
 	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
 	config.SchemasPath = ""
@@ -28,6 +31,8 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 			Description: server.Description,
 		})
 	}
+
+	r.Mux.Get("/docs", Swagger)
 	config.Info.Description = cfg.Description
 
 	config.Servers = serverList

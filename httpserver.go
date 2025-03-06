@@ -13,7 +13,13 @@ import (
 func NewService(lc fx.Lifecycle, cfg *Config) (*http.Server, *chi.Mux) {
 	mux := chi.NewRouter()
 	server := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+
+	for _, pc := range cfg.Proxy {
+		mux.Mount(pc.MountPath, NewReverseProxy(pc))
+	}
+
 	srv := &http.Server{Addr: server, Handler: mux}
+
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			ln, err := net.Listen("tcp", srv.Addr)
