@@ -2,10 +2,13 @@ package apiservices
 
 import (
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/slok/go-http-metrics/metrics/prometheus"
+	"github.com/slok/go-http-metrics/middleware"
 	"reflect"
 )
 
@@ -14,7 +17,7 @@ type Router struct {
 	Mux *chi.Mux
 }
 
-func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
+func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 	r := &Router{
 		Mux: cm,
 	}
@@ -39,6 +42,12 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 	config.Info.Description = cfg.Description
 
 	config.Servers = serverList
+
+	reporter := &MetricsReporter{Middleware: middleware.New(middleware.Config{
+		Service:  core.AppName,
+		Recorder: prometheus.NewRecorder(prometheus.Config{}),
+	}),
+	}
 	r.Api = humachi.New(cm, config)
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(TracingHandler)

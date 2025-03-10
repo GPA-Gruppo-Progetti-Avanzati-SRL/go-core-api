@@ -3,7 +3,6 @@ package apiservices
 import (
 	"context"
 	"crypto/tls"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -11,21 +10,11 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 )
 
 type MetricsReporter struct {
 	Middleware middleware.Middleware
-}
-
-func NewMetricsReporter() *MetricsReporter {
-
-	return &MetricsReporter{Middleware: middleware.New(middleware.Config{
-		Service:  core.AppName,
-		Recorder: prometheus.NewRecorder(prometheus.Config{}),
-	}),
-	}
 }
 
 func (m *MetricsReporter) MetricsHandler(ctx huma.Context, next func(huma.Context)) {
