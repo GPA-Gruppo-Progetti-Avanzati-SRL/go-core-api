@@ -17,6 +17,7 @@ type Server struct {
 }
 
 type Security struct {
+	Key          string `yaml:"key" mapstructure:"key" json:"key"`
 	Name         string `yaml:"name" mapstructure:"name" json:"name"`
 	Type         string `yaml:"type" mapstructure:"type" json:"type"`
 	Scheme       string `yaml:"scheme" mapstructure:"scheme" json:"scheme"`

@@ -44,7 +44,7 @@ func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 	config.Components.SecuritySchemes = make(map[string]*huma.SecurityScheme)
 	for _, sc := range cfg.Security {
 
-		config.Components.SecuritySchemes[sc.Name] = &huma.SecurityScheme{
+		config.Components.SecuritySchemes[sc.Key] = &huma.SecurityScheme{
 			Type:         sc.Type,
 			Scheme:       sc.Scheme,
 			BearerFormat: sc.BearerFormat,
@@ -54,7 +54,7 @@ func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 		}
 
 		security = append(security, map[string][]string{
-			sc.Name: {},
+			sc.Key: {},
 		})
 	}
 	config.Security = append(config.Security, security...)
