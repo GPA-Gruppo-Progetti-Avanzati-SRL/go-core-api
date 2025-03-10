@@ -4,6 +4,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"reflect"
 )
 
@@ -32,7 +33,8 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 		})
 	}
 
-	r.Mux.Get("/docs", Swagger)
+	r.Mux.Get("/openapi", Swagger)
+	r.Mux.Handle("/metrics", promhttp.Handler())
 	config.Info.Description = cfg.Description
 
 	config.Servers = serverList

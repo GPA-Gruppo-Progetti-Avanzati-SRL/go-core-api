@@ -17,16 +17,15 @@ import (
 
 type MetricsReporter struct {
 	Middleware middleware.Middleware
-	sm         *core.ServerMetrics
 }
 
-func NewMetricsReporter(sm *core.ServerMetrics) *MetricsReporter {
+func NewMetricsReporter() *MetricsReporter {
 
 	return &MetricsReporter{Middleware: middleware.New(middleware.Config{
 		Service:  core.AppName,
 		Recorder: prometheus.NewRecorder(prometheus.Config{}),
 	}),
-		sm: sm}
+	}
 }
 
 func (m *MetricsReporter) MetricsHandler(ctx huma.Context, next func(huma.Context)) {
