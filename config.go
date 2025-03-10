@@ -8,6 +8,7 @@ type Config struct {
 	Servers     []*Server      `yaml:"api-servers" mapstructure:"api-servers" json:"api-servers"`
 	Description string         `yaml:"api-description" mapstructure:"api-description" json:"api-description"`
 	Proxy       []*ProxyConfig `yaml:"proxy" mapstructure:"proxy" json:"proxy"`
+	Security    []*Security    `yaml:"security" mapstructure:"security" json:"security"`
 }
 
 type Server struct {
@@ -15,6 +16,14 @@ type Server struct {
 	Description string `yaml:"description" mapstructure:"description" json:"description"`
 }
 
+type Security struct {
+	Name         string `yaml:"name" mapstructure:"name" json:"name"`
+	Type         string `yaml:"type" mapstructure:"type" json:"type"`
+	Scheme       string `yaml:"scheme" mapstructure:"scheme" json:"scheme"`
+	BearerFormat string `yaml:"bearer-format" mapstructure:"bearer-format" json:"bearer-format"`
+	Description  string `yaml:"description" mapstructure:"description" json:"description"`
+	In           string `yaml:"in" mapstructure:"in" json:"in"`
+}
 type ProxyConfig struct {
 	MountPath string    `yaml:"mount-path" mapstructure:"mount-path" json:"mount-path"`
 	Url       string    `yaml:"url" mapstructure:"url" json:"url"`

@@ -39,8 +39,25 @@ func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 
 	r.Mux.Get("/openapi", swagger.Home)
 	r.Mux.Handle("/metrics", promhttp.Handler())
-	config.Info.Description = cfg.Description
 
+	var security []map[string][]string
+	config.Components.SecuritySchemes = make(map[string]*huma.SecurityScheme)
+	for _, sc := range cfg.Security {
+
+		config.Components.SecuritySchemes[sc.Name] = &huma.SecurityScheme{
+			Type:         sc.Type,
+			Scheme:       sc.Scheme,
+			BearerFormat: sc.BearerFormat,
+			Name:         sc.Name,
+			Description:  sc.Description,
+			In:           sc.In,
+		}
+
+		security = append(security, map[string][]string{
+			sc.Name: {},
+		})
+	}
+	config.Security = append(config.Security, security...)
 	config.Servers = serverList
 
 	reporter := &MetricsReporter{Middleware: middleware.New(middleware.Config{
