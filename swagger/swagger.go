@@ -1,4 +1,4 @@
-package apiservices
+package swagger
 
 import (
 	_ "embed"
@@ -8,7 +8,7 @@ import (
 //go:embed swagger.html
 var swagger []byte
 
-func Swagger(w http.ResponseWriter, r *http.Request) {
+func Home(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.Write(swagger)
 }

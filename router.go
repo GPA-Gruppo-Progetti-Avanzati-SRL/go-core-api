@@ -1,6 +1,7 @@
 package apiservices
 
 import (
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
@@ -33,7 +34,7 @@ func NewRouter(cm *chi.Mux, reporter *MetricsReporter, cfg *Config) *Router {
 		})
 	}
 
-	r.Mux.Get("/openapi", Swagger)
+	r.Mux.Get("/openapi", swagger.Home)
 	r.Mux.Handle("/metrics", promhttp.Handler())
 	config.Info.Description = cfg.Description
 
