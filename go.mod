@@ -3,10 +3,11 @@ module github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api
 go 1.23.2
 
 require (
-	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.2-0.20250311102032-95faa5ca9c50
+	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.2
 	github.com/danielgtaylor/huma/v2 v2.31.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-playground/validator/v10 v10.25.0
+	github.com/prometheus/client_golang v1.21.1
 	github.com/rs/zerolog v1.33.0
 	github.com/slok/go-http-metrics v0.13.0
 	go.opentelemetry.io/otel v1.35.0
@@ -38,7 +39,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
-	github.com/prometheus/client_golang v1.21.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
