@@ -4,11 +4,11 @@ import "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/page"
 
 type PagedResponse[T any] struct {
 	PageSize    int   `header:"pageSize"`
-	TotalItems  int64 `header:"totalItems"`
+	TotalCount  int64 `header:"totalCount"`
 	TotalPages  int   `header:"totalPages"`
 	CurrentPage int   `header:"currentPage"`
 	HasNext     bool  `header:"hasNext"`
-	HasPrev     bool  `header:"hasPrev"`
+	HasPrevious bool  `header:"hasPrevious"`
 	Body        []T
 }
 type PagingRequest struct {
@@ -20,11 +20,11 @@ func GeneratePageResponse[T any](body []T, paging *page.Paging) *PagedResponse[T
 
 	return &PagedResponse[T]{
 		PageSize:    paging.PageSize,
-		TotalItems:  paging.TotalItems,
+		TotalCount:  paging.TotalCount,
 		TotalPages:  paging.TotalPages,
 		CurrentPage: paging.CurrentPage,
 		HasNext:     paging.HasNext,
-		HasPrev:     paging.HasPrev,
+		HasPrevious: paging.HasPrevious,
 		Body:        body,
 	}
 }

@@ -3,7 +3,7 @@ module github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api
 go 1.23.2
 
 require (
-	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.2
+	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.3-0.20250318111754-6a619f43cbc6
 	github.com/danielgtaylor/huma/v2 v2.31.0
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/go-playground/validator/v10 v10.25.0
@@ -26,6 +26,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
+	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
@@ -48,7 +49,7 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/spf13/viper v1.19.0 // indirect
+	github.com/spf13/viper v1.20.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/bridges/prometheus v0.60.0 // indirect
