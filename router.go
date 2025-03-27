@@ -1,28 +1,34 @@
 package apiservices
 
 import (
+	"reflect"
+
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/locales/it"
+	ut "github.com/go-playground/universal-translator"
 	"github.com/go-playground/validator/v10"
 	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
-	"reflect"
 )
 
 type Router struct {
 	Api       huma.API
 	Mux       *chi.Mux
 	Validator *validator.Validate
+	Tranlator *ut.UniversalTranslator
 }
 
 func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 	r := &Router{
 		Mux: cm,
 	}
+	
 	r.Validator = validator.New()
+	r.Tranlator = ut.New(it.New(), it.New())
 
 	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
 	config.SchemasPath = ""

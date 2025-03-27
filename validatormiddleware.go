@@ -5,14 +5,18 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
-	"github.com/danielgtaylor/huma/v2"
-	"github.com/rs/zerolog/log"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/url"
 	"reflect"
 	"time"
+
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/rs/zerolog/log"
+
+	"github.com/go-playground/validator/v10"
 )
 
 func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
@@ -47,17 +51,22 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	log.Info().Msgf("ValidatorHandler Input: %+v", input)
 	// Valida i dati se non sono nulli
 	if input != nil {
-		if errValidate := r.Validator.Struct(input); errValidate != nil {
+		if err := r.Validator.Struct(input); err != nil {
+			errValidate := err.(validator.ValidationErrors)
+			var errorMessages []string
 			log.Warn().Err(err).Msg("Validation error")
 			vc.SetStatus(400)
 			vc.SetHeader("Content-Type", "application/json")
-			er := core.TechnicalErrorWithCodeAndMessage(ErrValidation, errValidate.Error())
+			for _, err := range errValidate {
+                errorMessages = append(errorMessages, fmt.Sprintf("Field '%s': %s.", err.Field(), err.Translate(r.Tranlator.GetFallback())))
+            }
+			errmsg := fmt.Sprintf("Validation errors: %s", errorMessages)
+			er := core.TechnicalErrorWithCodeAndMessage(ErrValidation, errmsg)
 			bitErrResposnse, _ := json.Marshal(er)
 			vc.BodyWriter().Write(bitErrResposnse)
 			return
 		}
 	}
-
 	// Procede con il prossimo handler
 	next(vc)
 
