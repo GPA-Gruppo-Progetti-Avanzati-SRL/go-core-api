@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
 	"io"
 	"mime/multipart"
@@ -15,8 +14,6 @@ import (
 	"reflect"
 	"time"
 )
-
-var validate = validator.New()
 
 func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 
@@ -50,7 +47,7 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	log.Info().Msgf("ValidatorHandler Input: %+v", input)
 	// Valida i dati se non sono nulli
 	if input != nil {
-		if errValidate := validate.Struct(input); errValidate != nil {
+		if errValidate := r.Validator.Struct(input); errValidate != nil {
 			log.Warn().Err(err).Msg("Validation error")
 			vc.SetStatus(400)
 			vc.SetHeader("Content-Type", "application/json")

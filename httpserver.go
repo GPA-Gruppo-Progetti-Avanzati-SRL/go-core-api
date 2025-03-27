@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
 	"net"
 	"net/http"
 )
 
-func NewService(lc fx.Lifecycle, cfg *Config) (*http.Server, *chi.Mux) {
+func NewService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
 	mux := chi.NewRouter()
 	server := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+
+	mux.Handle("/metrics", promhttp.Handler())
 
 	for _, pc := range cfg.Proxy {
 		mux.Mount(pc.MountPath, NewReverseProxy(pc))
@@ -34,5 +37,5 @@ func NewService(lc fx.Lifecycle, cfg *Config) (*http.Server, *chi.Mux) {
 			return srv.Shutdown(ctx)
 		},
 	})
-	return srv, mux
+	return mux
 }

@@ -6,21 +6,23 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/go-playground/validator/v10"
 	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 	"reflect"
 )
 
 type Router struct {
-	Api huma.API
-	Mux *chi.Mux
+	Api       huma.API
+	Mux       *chi.Mux
+	Validator *validator.Validate
 }
 
 func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 	r := &Router{
 		Mux: cm,
 	}
+	r.Validator = validator.New()
 
 	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
 	config.SchemasPath = ""
@@ -38,7 +40,6 @@ func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 	}
 
 	r.Mux.Get("/openapi", swagger.Home)
-	r.Mux.Handle("/metrics", promhttp.Handler())
 
 	var security []map[string][]string
 	config.Components.SecuritySchemes = make(map[string]*huma.SecurityScheme)
