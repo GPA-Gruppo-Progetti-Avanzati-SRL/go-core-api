@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -52,15 +53,23 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	// Valida i dati se non sono nulli
 	if input != nil {
 		if err := r.Validator.Struct(input); err != nil {
-			errValidate := err.(validator.ValidationErrors)
+			var errValidate validator.ValidationErrors
 			var errorMessages []string
-			log.Warn().Err(err).Msg("Validation error")
+			var errmsg string
+
 			vc.SetStatus(400)
 			vc.SetHeader("Content-Type", "application/json")
-			for _, err := range errValidate {
-                errorMessages = append(errorMessages, fmt.Sprintf("Field '%s': %s.", err.Field(), err.Translate(r.Tranlator.GetFallback())))
-            }
-			errmsg := fmt.Sprintf("Validation errors: %s", errorMessages)
+			log.Debug().Err(err).Msg("Validation error")
+
+			if errors.As(err, &errValidate) {
+				for _, err := range errValidate {
+					errorMessages = append(errorMessages, fmt.Sprintf("Field '%s': %s.", err.Field(), err.Translate(r.Tranlator.GetFallback())))
+				}
+				errmsg = fmt.Sprintf("Validation errors: %s", errorMessages)
+			} else {
+				errmsg = fmt.Sprintf("Validation error: %s", err.Error())
+			}
+			
 			er := core.TechnicalErrorWithCodeAndMessage(ErrValidation, errmsg)
 			bitErrResposnse, _ := json.Marshal(er)
 			vc.BodyWriter().Write(bitErrResposnse)
