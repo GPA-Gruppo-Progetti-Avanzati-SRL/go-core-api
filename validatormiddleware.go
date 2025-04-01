@@ -37,7 +37,7 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	}
 	schemaRef := content.Schema.Ref
 	t := registry.TypeFromRef(schemaRef)
-	log.Info().Msgf("ValidatorHandler type: %+v", t)
+	log.Trace().Msgf("ValidatorHandler type: %+v", t)
 	input := reflect.New(t).Interface()
 	b, err := io.ReadAll(vc.BodyReader())
 	if err != nil {
@@ -49,27 +49,27 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 		return
 	}
 
-	log.Info().Msgf("ValidatorHandler Input: %+v", input)
+	log.Trace().Msgf("ValidatorHandler Input: %+v", input)
 	// Valida i dati se non sono nulli
 	if input != nil {
-		if err := r.Validator.Struct(input); err != nil {
+		if verr := r.Validator.Struct(input); verr != nil {
 			var errValidate validator.ValidationErrors
 			var errorMessages []string
 			var errmsg string
 
 			vc.SetStatus(400)
 			vc.SetHeader("Content-Type", "application/json")
-			log.Debug().Err(err).Msg("Validation error")
+			log.Debug().Err(verr).Msg("Validation error")
 
 			if errors.As(err, &errValidate) {
-				for _, err := range errValidate {
-					errorMessages = append(errorMessages, fmt.Sprintf("Field '%s': %s.", err.Field(), err.Translate(r.Tranlator.GetFallback())))
+				for _, everr := range errValidate {
+					errorMessages = append(errorMessages, fmt.Sprintf("Field '%s': %s.", everr.Field(), everr.Translate(r.Tranlator.GetFallback())))
 				}
 				errmsg = fmt.Sprintf("Validation errors: %s", errorMessages)
 			} else {
 				errmsg = fmt.Sprintf("Validation error: %s", err.Error())
 			}
-			
+
 			er := core.TechnicalErrorWithCodeAndMessage(ErrValidation, errmsg)
 			bitErrResposnse, _ := json.Marshal(er)
 			vc.BodyWriter().Write(bitErrResposnse)
