@@ -61,13 +61,13 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 			vc.SetHeader("Content-Type", "application/json")
 			log.Debug().Err(verr).Msg("Validation error")
 
-			if errors.As(err, &errValidate) {
+			if errors.As(verr, &errValidate) {
 				for _, everr := range errValidate {
 					errorMessages = append(errorMessages, fmt.Sprintf("Field '%s': %s.", everr.Field(), everr.Translate(r.Tranlator.GetFallback())))
 				}
 				errmsg = fmt.Sprintf("Validation errors: %s", errorMessages)
 			} else {
-				errmsg = fmt.Sprintf("Validation error: %s", err.Error())
+				errmsg = fmt.Sprintf("Validation error: %s", verr.Error())
 			}
 
 			er := core.TechnicalErrorWithCodeAndMessage(ErrValidation, errmsg)
