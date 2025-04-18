@@ -1,5 +1,5 @@
-github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.4-0.20250414080506-5c457d43078e h1:RPEjkkthYZNHkpqbMlZnytq+S1PyJAJsG+GMfvK9Ox8=
-github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.4-0.20250414080506-5c457d43078e/go.mod h1:+szqcA6dffYiOMfA6eFNYg15mfyB7BRC7Ht2c/f27kY=
+github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.4 h1:ahHE6EXq/XhaOJiwd4+7kEE8Ue+82y8GhPeyDlYCfqk=
+github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.4/go.mod h1:+szqcA6dffYiOMfA6eFNYg15mfyB7BRC7Ht2c/f27kY=
 github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common v0.1.80 h1:cyH3Apeu0BnVw1k2zQwth0oRHcZaDufRY5Qg7PHlw+Y=
 github.com/GPA-Gruppo-Progetti-Avanzati-SRL/tpm-common v0.1.80/go.mod h1:4WYfJ0LgWLu38TukgFrFN4/zLePQ1BhFkpH/k28zRlA=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
