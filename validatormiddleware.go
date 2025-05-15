@@ -49,8 +49,8 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	// Valida i dati se non sono nulli
 	if input != nil {
 		if verr := core.ValidateStruct(input); verr != nil {
-			vc.SetStatus(400)
 			vc.SetHeader("Content-Type", "application/json")
+			vc.SetStatus(400)
 			bitErrResposnse, _ := json.Marshal(verr)
 			vc.BodyWriter().Write(bitErrResposnse)
 			return
