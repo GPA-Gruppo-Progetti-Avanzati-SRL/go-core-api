@@ -9,6 +9,7 @@ import (
 	"go.uber.org/fx"
 	"net"
 	"net/http"
+	"time"
 )
 
 func NewService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
@@ -20,8 +21,10 @@ func NewService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
 	for _, pc := range cfg.Proxy {
 		mux.Mount(pc.MountPath, NewReverseProxy(pc))
 	}
-
-	srv := &http.Server{Addr: server, Handler: mux}
+	if cfg.Idle == 0 {
+		cfg.Idle = 30 * time.Second
+	}
+	srv := &http.Server{Addr: server, Handler: mux, IdleTimeout: cfg.Idle}
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {

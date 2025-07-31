@@ -1,8 +1,11 @@
 package apiservices
 
+import "time"
+
 type Config struct {
 	Host        string         `yaml:"host" mapstructure:"host" json:"host"`
 	Port        int            `yaml:"port" mapstructure:"port" json:"port"`
+	Idle        time.Duration  `yaml:"idle" mapstructure:"idle" json:"idle" yaml:"idle"`
 	ApiName     string         `yaml:"api-name" mapstructure:"api-name" json:"api-name"`
 	ApiVersion  string         `yaml:"api-version" mapstructure:"api-version" json:"api-version"`
 	Servers     []*Server      `yaml:"api-servers" mapstructure:"api-servers" json:"api-servers"`
