@@ -3,7 +3,7 @@ module github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api
 go 1.24
 
 require (
-	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.7
+	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.8
 	github.com/danielgtaylor/huma/v2 v2.34.1
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/prometheus/client_golang v1.23.2
