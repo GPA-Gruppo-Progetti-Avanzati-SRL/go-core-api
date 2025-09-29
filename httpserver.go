@@ -3,20 +3,20 @@ package apiservices
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"time"
+
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	"go.uber.org/fx"
-	"net"
-	"net/http"
-	"time"
 )
 
 func NewService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
 	mux := chi.NewRouter()
 	server := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-
-	mux.Handle("/metrics", promhttp.Handler())
 
 	for _, pc := range cfg.Proxy {
 		mux.Mount(pc.MountPath, NewReverseProxy(pc))
@@ -27,7 +27,10 @@ func NewService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
 	srv := &http.Server{Addr: server, Handler: mux, IdleTimeout: cfg.Idle}
 
 	lc.Append(fx.Hook{
+
 		OnStart: func(ctx context.Context) error {
+			mux.Handle("/metrics", promhttp.Handler())
+			mux.Handle("/health", core.HealthHandler)
 			ln, err := net.Listen("tcp", srv.Addr)
 			if err != nil {
 				return err
