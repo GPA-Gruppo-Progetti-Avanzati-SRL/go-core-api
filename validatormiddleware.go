@@ -19,7 +19,6 @@ import (
 func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 
 	vc := &ValidatorContext{c: ctx}
-
 	if vc.Operation().RequestBody == nil {
 		next(vc)
 		return
@@ -114,6 +113,7 @@ func (r *ValidatorContext) BodyReader() io.Reader {
 		return r.br
 	}
 	b, _ := io.ReadAll(r.c.BodyReader())
+	r.c.SetReadDeadline(time.Time{})
 	r.br = bytes.NewReader(b)
 	return r.br
 
@@ -124,7 +124,8 @@ func (r *ValidatorContext) GetMultipartForm() (*multipart.Form, error) {
 }
 
 func (r *ValidatorContext) SetReadDeadline(time time.Time) error {
-	return r.c.SetReadDeadline(time)
+	//Already read body so it becomes "moot" and dangerous to set a deadline
+	return nil
 }
 
 func (r *ValidatorContext) SetStatus(code int) {
