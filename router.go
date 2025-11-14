@@ -3,8 +3,9 @@ package apiservices
 import (
 	"reflect"
 
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
@@ -13,13 +14,15 @@ import (
 )
 
 type Router struct {
-	Api huma.API
-	Mux *chi.Mux
+	Api         huma.API
+	Mux         *chi.Mux
+	roleMatcher authorization.RoleMatcher
 }
 
-func NewRouter(cm *chi.Mux, cfg *Config) *Router {
+func NewRouter(cm *chi.Mux, cfg *Config, matcher authorization.RoleMatcher) *Router {
 	r := &Router{
-		Mux: cm,
+		Mux:         cm,
+		roleMatcher: matcher,
 	}
 
 	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
@@ -39,24 +42,8 @@ func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 
 	r.Mux.Get("/openapi", swagger.Home)
 
-	var security []map[string][]string
-	config.Components.SecuritySchemes = make(map[string]*huma.SecurityScheme)
-	for _, sc := range cfg.Security {
-
-		config.Components.SecuritySchemes[sc.Key] = &huma.SecurityScheme{
-			Type:         sc.Type,
-			Scheme:       sc.Scheme,
-			BearerFormat: sc.BearerFormat,
-			Name:         sc.Name,
-			Description:  sc.Description,
-			In:           sc.In,
-		}
-
-		security = append(security, map[string][]string{
-			sc.Key: {},
-		})
-	}
-	config.Security = append(config.Security, security...)
+	// Nota: la configurazione Security non è più presente nel Config corrente;
+	// lasciamo Components e Security invariati.
 	config.Servers = serverList
 
 	reporter := &MetricsReporter{Middleware: middleware.New(middleware.Config{
@@ -67,7 +54,12 @@ func NewRouter(cm *chi.Mux, cfg *Config) *Router {
 	r.Api = humachi.New(cm, config)
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(TracingHandler)
+	if cfg.Authorization != nil && cfg.Authorization.Enabled {
+		r.Api.UseMiddleware(r.AuthorizationHandler(cfg.Authorization))
+		huma.Register(r.Api, authorization.WhoamiOperation, authorization.Whoami)
+	}
 	r.Api.UseMiddleware(r.ValidatorHandler)
+
 	ConfigureError()
 	return r
 }
