@@ -1,17 +1,21 @@
 package apiservices
 
-import "time"
+import (
+	"time"
+
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
+)
 
 type Config struct {
-	Host          string               `yaml:"host" mapstructure:"host" json:"host"`
-	Port          int                  `yaml:"port" mapstructure:"port" json:"port"`
-	Idle          time.Duration        `yaml:"idle" mapstructure:"idle" json:"idle" yaml:"idle"`
-	ApiName       string               `yaml:"api-name" mapstructure:"api-name" json:"api-name"`
-	ApiVersion    string               `yaml:"api-version" mapstructure:"api-version" json:"api-version"`
-	Servers       []*Server            `yaml:"api-servers" mapstructure:"api-servers" json:"api-servers"`
-	Description   string               `yaml:"api-description" mapstructure:"api-description" json:"api-description"`
-	Proxy         []*ProxyConfig       `yaml:"proxy" mapstructure:"proxy" json:"proxy"`
-	Authorization *AuthorizationConfig `yaml:"authorization" mapstructure:"authorization" json:"authorization"`
+	Host          string                `yaml:"host" mapstructure:"host" json:"host"`
+	Port          int                   `yaml:"port" mapstructure:"port" json:"port"`
+	Idle          time.Duration         `yaml:"idle" mapstructure:"idle" json:"idle" yaml:"idle"`
+	ApiName       string                `yaml:"api-name" mapstructure:"api-name" json:"api-name"`
+	ApiVersion    string                `yaml:"api-version" mapstructure:"api-version" json:"api-version"`
+	Servers       []*Server             `yaml:"api-servers" mapstructure:"api-servers" json:"api-servers"`
+	Description   string                `yaml:"api-description" mapstructure:"api-description" json:"api-description"`
+	Proxy         []*ProxyConfig        `yaml:"proxy" mapstructure:"proxy" json:"proxy"`
+	Authorization *authorization.Config `yaml:"authorization" mapstructure:"authorization" json:"authorization"`
 }
 
 type Server struct {
@@ -31,8 +35,3 @@ type Header struct {
 }
 
 // AuthorizationConfig definisce il comportamento del middleware autorizzativo.
-type AuthorizationConfig struct {
-	Enabled     bool     `yaml:"enabled" mapstructure:"enabled" json:"enabled"`
-	RolesHeader string   `yaml:"roles-header" mapstructure:"roles-header" json:"roles-header"`
-	GuestPaths  []string `yaml:"guest-paths" mapstructure:"guest-paths" json:"guest-paths"`
-}

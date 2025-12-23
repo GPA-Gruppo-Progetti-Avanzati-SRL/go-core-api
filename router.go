@@ -5,24 +5,24 @@ import (
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
-	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	coreauth "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/authorization"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
 	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 )
 
 type Router struct {
-	Api         huma.API
-	Mux         *chi.Mux
-	roleMatcher authorization.RoleMatcher
+	Api huma.API
+	Mux *chi.Mux
 }
 
-func NewRouter(cm *chi.Mux, cfg *Config, matcher authorization.RoleMatcher) *Router {
+func NewRouter(cm *chi.Mux, cfg *Config, matcher coreauth.Authorizer) *Router {
 	r := &Router{
-		Mux:         cm,
-		roleMatcher: matcher,
+		Mux: cm,
 	}
 
 	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
@@ -55,13 +55,32 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher authorization.RoleMatcher) *Rou
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(TracingHandler)
 	if cfg.Authorization != nil && cfg.Authorization.Enabled {
-		r.Api.UseMiddleware(r.AuthorizationHandler(cfg.Authorization))
-		huma.Register(r.Api, authorization.WhoamiOperation, authorization.Whoami)
+		// Inject authorizer in context for downstream middlewares/handlers
+		if matcher != nil {
+			r.Api.UseMiddleware(AuthorizerInjector(matcher))
+			r.Api.UseMiddleware(authorization.AuthorizationHandler(cfg.Authorization))
+			// Register standalone handlers (decoupled from Router)
+			huma.Register(r.Api, authorization.WhoamiOperation, authorization.Whoami)
+			huma.Register(r.Api, authorization.MenuOperation, authorization.Menu)
+		} else {
+			log.Fatal().Msg("No authorization operator  specified so i can't register the authorization middleware")
+		}
+
 	}
 	r.Api.UseMiddleware(r.ValidatorHandler)
-
 	ConfigureError()
 	return r
+}
+
+// AuthorizerInjector injects the provided Authorizer into the request context so that
+// downstream middlewares and handlers can retrieve it without binding to Router.
+func AuthorizerInjector(auth coreauth.Authorizer) func(huma.Context, func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		if auth != nil {
+			ctx = huma.WithValue(ctx, "authorizer", auth)
+		}
+		next(ctx)
+	}
 }
 
 var ApiRegistry = huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)

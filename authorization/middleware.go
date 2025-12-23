@@ -1,9 +1,10 @@
-package apiservices
+package authorization
 
 import (
 	"net/http"
 	"strings"
 
+	coreauth "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/authorization"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/rs/zerolog/log"
 )
@@ -12,7 +13,7 @@ import (
 // di un ruolo/funzione nell'header (iniettato da un proxy) corrispondente
 // all'endpoint invocato. L'identificatore richiesto è per default l'OperationID
 // dell'endpoint; in alternativa può usare metodo+path.
-func (r *Router) AuthorizationHandler(cfg *AuthorizationConfig) func(huma.Context, func(huma.Context)) {
+func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 	// Imposta default sicuri
 	rolesHeader := "X-Roles"
 	delimiter := ","
@@ -73,14 +74,22 @@ func (r *Router) AuthorizationHandler(cfg *AuthorizationConfig) func(huma.Contex
 		// Arricchisce il context Huma con i valori richiesti
 		ctx = huma.WithValue(ctx, "user", user)
 		ctx = huma.WithValue(ctx, "roles", roles)
-		// Se non è stato iniettato alcun matcher, usa quello di default
-		matcher := r.roleMatcher
-		if matcher == nil {
+
+		// Recupera l'authorizer eventualmente iniettato da AuthorizerInjector
+		var authorizer coreauth.Authorizer
+		if v := ctx.Context().Value("authorizer"); v != nil {
+			if a, ok := v.(coreauth.Authorizer); ok {
+				authorizer = a
+			}
+		}
+
+		// Se non è stato iniettato alcun matcher, consenti (policy attuale) ma avvisa
+		if authorizer == nil {
 			log.Warn().Msg("No role matcher specified so i pass")
 			next(ctx)
 			return
 		}
-		if !matcher.Match(roles, required) {
+		if !authorizer.Match(roles, required) {
 			deny(ctx, rolesHeader, required)
 			return
 		}
