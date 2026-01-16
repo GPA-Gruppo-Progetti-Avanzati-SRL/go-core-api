@@ -13,14 +13,19 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
+	"go.uber.org/fx"
 )
 
 type Router struct {
 	Api huma.API
 	Mux *chi.Mux
 }
+type Matcher struct {
+	fx.In
+	Authorizer coreauth.Authorizer `optional:"true"`
+}
 
-func NewRouter(cm *chi.Mux, cfg *Config, matcher coreauth.Authorizer) *Router {
+func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	r := &Router{
 		Mux: cm,
 	}
@@ -56,8 +61,8 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher coreauth.Authorizer) *Router {
 	r.Api.UseMiddleware(TracingHandler)
 	if cfg.Authorization != nil && cfg.Authorization.Enabled {
 		// Inject authorizer in context for downstream middlewares/handlers
-		if matcher != nil {
-			r.Api.UseMiddleware(AuthorizerInjector(matcher))
+		if matcher.Authorizer != nil {
+			r.Api.UseMiddleware(AuthorizerInjector(matcher.Authorizer))
 			r.Api.UseMiddleware(authorization.AuthorizationHandler(cfg.Authorization))
 			// Register standalone handlers (decoupled from Router)
 			huma.Register(r.Api, authorization.WhoamiOperation, authorization.Whoami)
