@@ -64,7 +64,7 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 		rolesStr := ctx.Header(rolesHeader)
 		if rolesStr == "" {
 			// Niente ruoli: forbidden
-			deny(ctx, rolesHeader, required)
+			deny(ctx)
 			return
 		}
 		// Parsing header in lista di ruoli usando il delimitatore configurato
@@ -90,7 +90,7 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 			return
 		}
 		if !authorizer.Match(roles, required) {
-			deny(ctx, rolesHeader, required)
+			deny(ctx)
 			return
 		}
 		next(ctx)
@@ -109,9 +109,9 @@ func parseRoles(v, delimiter string) []string {
 	return out
 }
 
-func deny(ctx huma.Context, rolesHeader, required string) {
+func deny(ctx huma.Context) {
 	ctx.SetStatus(http.StatusForbidden)
 	ctx.SetHeader("Content-Type", "application/json")
-	body := `{"error":"forbidden","message":"missing required role","required":"` + required + `","header":"` + rolesHeader + `"}`
+	body := `{"error":"forbidden","message":"missing required role"}`
 	_, _ = ctx.BodyWriter().Write([]byte(body))
 }

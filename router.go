@@ -65,8 +65,7 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 			r.Api.UseMiddleware(AuthorizerInjector(matcher.Authorizer))
 			r.Api.UseMiddleware(authorization.AuthorizationHandler(cfg.Authorization))
 			// Register standalone handlers (decoupled from Router)
-			huma.Register(r.Api, authorization.WhoamiOperation, authorization.Whoami)
-			huma.Register(r.Api, authorization.MenuOperation, authorization.Menu)
+			huma.Register(r.Api, authorization.TokenOperation, authorization.Token)
 		} else {
 			log.Fatal().Msg("No authorization operator  specified so i can't register the authorization middleware")
 		}
