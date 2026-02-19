@@ -62,6 +62,8 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 		}
 
 		rolesStr := ctx.Header(rolesHeader)
+		log.Trace().Msgf("Roles header %s", rolesStr)
+
 		if rolesStr == "" {
 			// Niente ruoli: forbidden
 			deny(ctx)
@@ -71,6 +73,7 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 		roles := parseRoles(rolesStr, delimiter)
 		// Propaga nel context anche l'utente (se presente) e la lista ruoli
 		user := strings.TrimSpace(ctx.Header(userHeader))
+		log.Trace().Msgf("User header %s", user)
 		// Arricchisce il context Huma con i valori richiesti
 		ctx = huma.WithValue(ctx, "user", user)
 		ctx = huma.WithValue(ctx, "roles", roles)

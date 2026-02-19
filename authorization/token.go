@@ -2,18 +2,12 @@ package authorization
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
-	"crypto/rand"
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
-	"io"
-	"net/http"
-
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	coreauth "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/authorization"
 	"github.com/danielgtaylor/huma/v2"
+	"net/http"
 )
 
 var TokenResponses = map[string]*huma.Response{
@@ -89,65 +83,11 @@ func Token(ctx context.Context, i *tokenRequest) (*RawStringOutput, error) {
 		return nil, err
 	}
 
-	cipherText, err := encrypt(b, i.AppID)
+	cipherText, err := core.Encrypt(b, i.AppID)
 	if err != nil {
 		return nil, huma.Error500InternalServerError("encryption error", err)
 	}
 
 	return &RawStringOutput{Body: []byte(hex.EncodeToString(cipherText)), ContentType: "text/plain"}, nil
 
-}
-
-func encrypt(plaintext []byte, keyStr string) ([]byte, error) {
-	// Crea una chiave di 32 byte dall'AppID usando SHA-256
-	hash := sha256.Sum256([]byte(keyStr))
-	key := hash[:]
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-
-	// Concatena il nonce al ciphertext.
-	return gcm.Seal(nonce, nonce, plaintext, nil), nil
-}
-
-// decrypt decritta un messaggio esadecimale usando l'AppID come chiave.
-// Il nonce è atteso all'inizio del ciphertext decodificato da hex.
-func decrypt(ciphertextHex string, keyStr string) ([]byte, error) {
-	ciphertext, err := hex.DecodeString(ciphertextHex)
-	if err != nil {
-		return nil, err
-	}
-
-	hash := sha256.Sum256([]byte(keyStr))
-	key := hash[:]
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-
-	gcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return nil, err
-	}
-
-	nonceSize := gcm.NonceSize()
-	if len(ciphertext) < nonceSize {
-		return nil, errors.New("ciphertext too short")
-	}
-
-	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	return gcm.Open(nil, nonce, ciphertext, nil)
 }
