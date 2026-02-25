@@ -29,27 +29,37 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	r := &Router{
 		Mux: cm,
 	}
+	var config huma.Config
 
-	config := huma.DefaultConfig(cfg.ApiName, cfg.ApiVersion)
-	config.SchemasPath = ""
-	config.CreateHooks = nil
-	config.OpenAPI.Components.Schemas = ApiRegistry
-	config.Components = &huma.Components{
-		Schemas: ApiRegistry,
-	}
-	var serverList []*huma.Server
-	for _, server := range cfg.Servers {
-		serverList = append(serverList, &huma.Server{
-			URL:         server.Url,
-			Description: server.Description,
-		})
-	}
+	if cfg.OpenApi == nil || !cfg.OpenApi.Enabled {
+		config = huma.DefaultConfig("", "")
+		config.DocsPath = ""
+		config.OpenAPIPath = ""
 
-	r.Mux.Get("/openapi", swagger.Home)
+	}
+	if cfg.OpenApi != nil && cfg.OpenApi.Enabled {
+		config = huma.DefaultConfig(cfg.OpenApi.ApiName, cfg.OpenApi.ApiVersion)
+		config.SchemasPath = ""
+		config.CreateHooks = nil
+		config.OpenAPI.Components.Schemas = ApiRegistry
+		config.Components = &huma.Components{
+			Schemas: ApiRegistry,
+		}
+		var serverList []*huma.Server
+		for _, server := range cfg.OpenApi.Servers {
+			serverList = append(serverList, &huma.Server{
+				URL:         server.Url,
+				Description: server.Description,
+			})
+		}
+
+		r.Mux.Get("/openapi", swagger.Home)
+		config.Servers = serverList
+		config.DocsRenderer = huma.DocsRendererScalar
+	}
 
 	// Nota: la configurazione Security non è più presente nel Config corrente;
 	// lasciamo Components e Security invariati.
-	config.Servers = serverList
 
 	reporter := &MetricsReporter{Middleware: middleware.New(middleware.Config{
 		Service:  core.AppName,

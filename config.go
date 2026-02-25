@@ -7,15 +7,21 @@ import (
 )
 
 type Config struct {
-	Host          string                `yaml:"host" mapstructure:"host" json:"host"`
-	Port          int                   `yaml:"port" mapstructure:"port" json:"port"`
-	Idle          time.Duration         `yaml:"idle" mapstructure:"idle" json:"idle" yaml:"idle"`
-	ApiName       string                `yaml:"api-name" mapstructure:"api-name" json:"api-name"`
-	ApiVersion    string                `yaml:"api-version" mapstructure:"api-version" json:"api-version"`
-	Servers       []*Server             `yaml:"api-servers" mapstructure:"api-servers" json:"api-servers"`
-	Description   string                `yaml:"api-description" mapstructure:"api-description" json:"api-description"`
+	Host string        `yaml:"host" mapstructure:"host" json:"host"`
+	Port int           `yaml:"port" mapstructure:"port" json:"port"`
+	Idle time.Duration `yaml:"idle" mapstructure:"idle" json:"idle" yaml:"idle"`
+
 	Proxy         []*ProxyConfig        `yaml:"proxy" mapstructure:"proxy" json:"proxy"`
 	Authorization *authorization.Config `yaml:"authorization" mapstructure:"authorization" json:"authorization"`
+	OpenApi       *OpenApiConfig        `yaml:"openapi" mapstructure:"openapi" json:"openapi"`
+}
+
+type OpenApiConfig struct {
+	Enabled     bool      `yaml:"enabled" mapstructure:"enabled" json:"enabled"`
+	ApiName     string    `yaml:"api-name" mapstructure:"api-name" json:"api-name"`
+	ApiVersion  string    `yaml:"api-version" mapstructure:"api-version" json:"api-version"`
+	Servers     []*Server `yaml:"api-servers" mapstructure:"api-servers" json:"api-servers"`
+	Description string    `yaml:"api-description" mapstructure:"api-description" json:"api-description"`
 }
 
 type Server struct {
