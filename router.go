@@ -8,6 +8,7 @@ import (
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	coreauth "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/authorization"
 	"github.com/danielgtaylor/huma/v2"
+	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
@@ -15,6 +16,27 @@ import (
 	"github.com/slok/go-http-metrics/middleware"
 	"go.uber.org/fx"
 )
+
+// idempotentRegisterer wraps a prometheus.Registerer to silently ignore
+// AlreadyRegisteredError. This allows NewRouter to be called multiple times
+// (e.g., in tests) without panicking on duplicate metric registration.
+type idempotentRegisterer struct{ prom.Registerer }
+
+func (r idempotentRegisterer) Register(c prom.Collector) error {
+	err := r.Registerer.Register(c)
+	if _, ok := err.(prom.AlreadyRegisteredError); ok {
+		return nil
+	}
+	return err
+}
+
+func (r idempotentRegisterer) MustRegister(cs ...prom.Collector) {
+	for _, c := range cs {
+		if err := r.Register(c); err != nil {
+			panic(err)
+		}
+	}
+}
 
 type Router struct {
 	Api huma.API
@@ -63,7 +85,7 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 
 	reporter := &MetricsReporter{Middleware: middleware.New(middleware.Config{
 		Service:  core.AppName,
-		Recorder: prometheus.NewRecorder(prometheus.Config{}),
+		Recorder: prometheus.NewRecorder(prometheus.Config{Registry: idempotentRegisterer{prom.DefaultRegisterer}}),
 	}),
 	}
 	r.Api = humachi.New(cm, config)

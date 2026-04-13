@@ -4,6 +4,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"testing"
+
+	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 )
 
 func TestTokenEncryption(t *testing.T) {
@@ -19,8 +21,7 @@ func TestTokenEncryption(t *testing.T) {
 		t.Fatalf("failed to marshal payload: %v", err)
 	}
 
-	// Use the internal encrypt function from token.go
-	cipherBytes, err := encrypt(b, appID)
+	cipherBytes, err := core.Encrypt(b, appID)
 	if err != nil {
 		t.Fatalf("failed to encrypt payload: %v", err)
 	}
@@ -28,8 +29,7 @@ func TestTokenEncryption(t *testing.T) {
 	cipherHex := hex.EncodeToString(cipherBytes)
 	t.Logf("Encrypted hex: %s", cipherHex)
 
-	// Now decrypt it
-	decryptedBytes, err := decrypt(cipherHex, appID)
+	decryptedBytes, err := core.Decrypt(cipherHex, appID)
 	if err != nil {
 		t.Fatalf("failed to decrypt payload: %v", err)
 	}
