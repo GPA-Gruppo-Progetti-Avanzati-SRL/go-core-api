@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"net/http"
+
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	coreauth "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/authorization"
 	"github.com/danielgtaylor/huma/v2"
-	"net/http"
 )
 
 var TokenResponses = map[string]*huma.Response{
@@ -25,15 +26,16 @@ func (r *RawStringOutput) MarshalJSON() ([]byte, error) {
 
 type tokenBodyResponse struct {
 	User         string           `json:"user"`
+	Context      string           `json:"context,omitempty"`
 	Roles        []string         `json:"roles"`
 	Capabilities []string         `json:"capabilities"`
 	Apps         []*coreauth.App  `json:"apps"`
 	Paths        []*coreauth.Path `json:"paths"`
 }
 
-// whoamiRequest consente di passare opzionalmente l'AppId via header
+// tokenRequest consente di passare opzionalmente l'AppId via header
 type tokenRequest struct {
-	AppID string `header:"AppId"  required:"true"`
+	AppID string `header:"AppId" required:"true"`
 }
 
 var TokenOperation = huma.Operation{
@@ -48,36 +50,58 @@ var TokenOperation = huma.Operation{
 
 // Token restituisce informazioni sull'utente e capacità derivate dai ruoli, leggendo dal context.
 // Il risultato è cifrato in formato hex usando l'AppID come chiave.
+// Apps usa allRoles per visione globale delle app navigabili (incluse le istanze multicontext).
+// Capabilities e Paths usano i ruoli filtrati per contesto (contextRoles).
 func Token(ctx context.Context, i *tokenRequest) (*RawStringOutput, error) {
-	// Estrae user e roles dal context impostato dal middleware di autorizzazione
 	var user string
 	if v := ctx.Value("user"); v != nil {
 		if s, ok := v.(string); ok {
 			user = s
 		}
 	}
-	var roles []string
+
+	// contextRoles: ruoli filtrati per il contesto corrente (per Match, GetPaths, GetCapabilities)
+	var contextRoles []string
 	if v := ctx.Value("roles"); v != nil {
 		if rr, ok := v.([]string); ok {
-			roles = rr
+			contextRoles = rr
 		}
 	}
 
-	// Recupera l'authorizer dal context, se presente
+	// allRoles: tutti i ruoli dell'utente (per GetApps — visione globale delle app navigabili)
+	allRoles := contextRoles // fallback: se allRoles non è nel context usa contextRoles
+	if v := ctx.Value("allRoles"); v != nil {
+		if rr, ok := v.([]string); ok {
+			allRoles = rr
+		}
+	}
+
+	var contextId string
+	if v := ctx.Value("contextId"); v != nil {
+		if s, ok := v.(string); ok {
+			contextId = s
+		}
+	}
+
 	var caps []string
 	var apps []*coreauth.App
 	var paths []*coreauth.Path
 	if v := ctx.Value("authorizer"); v != nil {
 		if auth, ok := v.(coreauth.Authorizer); ok && auth != nil {
-
-			apps = auth.GetApps(roles)
-			paths = auth.GetPaths(roles, i.AppID)
-			caps = auth.GetCapabilities(roles, i.AppID)
-
+			apps = auth.GetApps(allRoles, contextId)           // scoped al contesto corrente
+			paths = auth.GetPaths(contextRoles, i.AppID)       // scoped al contesto corrente
+			caps = auth.GetCapabilities(contextRoles, i.AppID) // scoped al contesto corrente
 		}
 	}
 
-	body := &tokenBodyResponse{User: user, Roles: roles, Capabilities: caps, Apps: apps, Paths: paths}
+	body := &tokenBodyResponse{
+		User:         user,
+		Context:      contextId,
+		Roles:        contextRoles,
+		Capabilities: caps,
+		Apps:         apps,
+		Paths:        paths,
+	}
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -89,5 +113,4 @@ func Token(ctx context.Context, i *tokenRequest) (*RawStringOutput, error) {
 	}
 
 	return &RawStringOutput{Body: []byte(hex.EncodeToString(cipherText)), ContentType: "text/plain"}, nil
-
 }

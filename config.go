@@ -11,9 +11,9 @@ type Config struct {
 	Port int           `yaml:"port" mapstructure:"port" json:"port"`
 	Idle time.Duration `yaml:"idle" mapstructure:"idle" json:"idle" yaml:"idle"`
 
-	Proxy         []*ProxyConfig        `yaml:"proxy" mapstructure:"proxy" json:"proxy"`
+	Proxy         []*ProxyConfig        `yaml:"proxy"         mapstructure:"proxy"         json:"proxy"`
 	Authorization *authorization.Config `yaml:"authorization" mapstructure:"authorization" json:"authorization"`
-	OpenApi       *OpenApiConfig        `yaml:"openapi" mapstructure:"openapi" json:"openapi"`
+	OpenApi       *OpenApiConfig        `yaml:"openapi"       mapstructure:"openapi"       json:"openapi"`
 }
 
 type OpenApiConfig struct {

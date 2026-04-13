@@ -67,6 +67,11 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	}),
 	}
 	r.Api = humachi.New(cm, config)
+
+	// GET /capabilities: espone le capability api/action_api del backend.
+	// Registrato su chi direttamente: no auth, non appare nell'OpenAPI spec.
+	cm.Get("/capabilities", capabilitiesHandler(r.Api))
+
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(TracingHandler)
 	if cfg.Authorization != nil && cfg.Authorization.Enabled {

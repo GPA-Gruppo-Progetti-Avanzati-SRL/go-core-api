@@ -16,8 +16,9 @@ import (
 func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 	// Imposta default sicuri
 	rolesHeader := "X-Roles"
-	delimiter := ","
+	contextHeader := "X-Context"
 	userHeader := "X-User"
+	delimiter := ","
 
 	guestPaths := map[string]struct{}{
 		"/openapi": {},
@@ -28,7 +29,15 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 		if cfg.RolesHeader != "" {
 			rolesHeader = cfg.RolesHeader
 		}
-
+		if cfg.ContextHeader != "" {
+			contextHeader = cfg.ContextHeader
+		}
+		if cfg.UserHeader != "" {
+			userHeader = cfg.UserHeader
+		}
+		if cfg.Delimiter != "" {
+			delimiter = cfg.Delimiter
+		}
 		if len(cfg.GuestPaths) > 0 {
 			guestPaths = map[string]struct{}{}
 			for _, p := range cfg.GuestPaths {
@@ -43,20 +52,9 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 			next(ctx)
 			return
 		}
-		if _, ok := guestPaths[ctx.URL().Path]; ok {
-			next(ctx)
-			return
-		}
 
-		op := ctx.Operation()
-		var required string
-
-		required = op.OperationID
-		log.Trace().Msgf("Operation id %s", required)
-
-		// Se non c'è modo di determinare l'identificatore, lascia passare
-		if required == "" {
-			log.Debug().Msg("Authorization: nessun identificatore endpoint, bypass")
+		path := ctx.URL().Path
+		if _, ok := guestPaths[path]; ok {
 			next(ctx)
 			return
 		}
@@ -65,18 +63,14 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 		log.Trace().Msgf("Roles header %s", rolesStr)
 
 		if rolesStr == "" {
-			// Niente ruoli: forbidden
 			deny(ctx)
 			return
 		}
-		// Parsing header in lista di ruoli usando il delimitatore configurato
-		roles := parseRoles(rolesStr, delimiter)
-		// Propaga nel context anche l'utente (se presente) e la lista ruoli
+
+		allRoles := parseRoles(rolesStr, delimiter)
 		user := strings.TrimSpace(ctx.Header(userHeader))
-		log.Trace().Msgf("User header %s", user)
-		// Arricchisce il context Huma con i valori richiesti
-		ctx = huma.WithValue(ctx, "user", user)
-		ctx = huma.WithValue(ctx, "roles", roles)
+		contextId := strings.TrimSpace(ctx.Header(contextHeader))
+		log.Trace().Msgf("User header %s, Context header %s", user, contextId)
 
 		// Recupera l'authorizer eventualmente iniettato da AuthorizerInjector
 		var authorizer coreauth.Authorizer
@@ -86,13 +80,30 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 			}
 		}
 
+		// Filtraggio per contesto: se presente X-Context, riduce i ruoli a quelli validi
+		contextRoles := allRoles
+		if contextId != "" && authorizer != nil {
+			contextRoles = authorizer.FilterRolesByContext(allRoles, contextId)
+			if len(contextRoles) == 0 {
+				denyContext(ctx)
+				return
+			}
+		}
+
+		// Arricchisce il context Huma con i valori richiesti
+		ctx = huma.WithValue(ctx, "user", user)
+		ctx = huma.WithValue(ctx, "contextId", contextId)
+		ctx = huma.WithValue(ctx, "allRoles", allRoles)  // tutti i ruoli (per GetApps nel token)
+		ctx = huma.WithValue(ctx, "roles", contextRoles) // ruoli del contesto corrente
+
 		// Se non è stato iniettato alcun matcher, consenti (policy attuale) ma avvisa
 		if authorizer == nil {
 			log.Warn().Msg("No role matcher specified so i pass")
 			next(ctx)
 			return
 		}
-		if !authorizer.Match(roles, required) {
+
+		if !authorizer.MatchRequest(contextRoles, path, ctx.Method()) {
 			deny(ctx)
 			return
 		}
@@ -115,6 +126,11 @@ func parseRoles(v, delimiter string) []string {
 func deny(ctx huma.Context) {
 	ctx.SetStatus(http.StatusForbidden)
 	ctx.SetHeader("Content-Type", "application/json")
-	body := `{"error":"forbidden","message":"missing required role"}`
-	_, _ = ctx.BodyWriter().Write([]byte(body))
+	_, _ = ctx.BodyWriter().Write([]byte(`{"error":"forbidden","message":"missing required role"}`))
+}
+
+func denyContext(ctx huma.Context) {
+	ctx.SetStatus(http.StatusForbidden)
+	ctx.SetHeader("Content-Type", "application/json")
+	_, _ = ctx.BodyWriter().Write([]byte(`{"error":"forbidden","message":"context not authorized"}`))
 }
