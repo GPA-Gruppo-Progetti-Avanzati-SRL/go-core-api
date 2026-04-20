@@ -1,6 +1,9 @@
 package apiservices
 
-import "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/page"
+import (
+	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/page"
+)
 
 type PagedResponse[T any] struct {
 	PageSize    int   `header:"pageSize"`
@@ -11,9 +14,21 @@ type PagedResponse[T any] struct {
 	HasPrevious bool  `header:"hasPrevious"`
 	Body        []T
 }
+
 type PagingRequest struct {
-	PageSize   int `query:"pagesize" default:"-1"`
-	PageNumber int `query:"pagenumber" default:"-1"`
+	PageSize   int    `query:"pagesize" default:"-1"`
+	PageNumber int    `query:"pagenumber" default:"-1"`
+	Sort       string `query:"sort"` // es. "name:asc,createdAt:desc"
+}
+
+// GetSort parses the Sort query param into a SortRequest.
+// Returns nil without error when Sort is empty.
+func (p *PagingRequest) GetSort() (page.SortRequest, *core.ApplicationError) {
+	s, err := page.ParseSort(p.Sort)
+	if err != nil {
+		return nil, core.BusinessErrorWithCodeAndMessage("ERR-SORT", err.Error())
+	}
+	return s, nil
 }
 
 func GeneratePageResponse[T any](body []T, paging *page.Paging) *PagedResponse[T] {
