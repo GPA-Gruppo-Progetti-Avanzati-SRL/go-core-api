@@ -38,8 +38,8 @@ func TestOpenApiDisabled(t *testing.T) {
 func TestOpenApiEnabled(t *testing.T) {
 	mux := chi.NewRouter()
 	cfg := &Config{
+		DevelopMode: true,
 		OpenApi: &OpenApiConfig{
-			Enabled:    true,
 			ApiName:    "Test API",
 			ApiVersion: "1.0.0",
 		},

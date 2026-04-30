@@ -8,9 +8,9 @@ import (
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	coreauth "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/authorization"
 	"github.com/danielgtaylor/huma/v2"
-	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	prom "github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
@@ -53,13 +53,7 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	}
 	var config huma.Config
 
-	if cfg.OpenApi == nil || !cfg.OpenApi.Enabled {
-		config = huma.DefaultConfig("", "")
-		config.DocsPath = ""
-		config.OpenAPIPath = ""
-
-	}
-	if cfg.OpenApi != nil && cfg.OpenApi.Enabled {
+	if cfg.DevelopMode && cfg.OpenApi != nil {
 		config = huma.DefaultConfig(cfg.OpenApi.ApiName, cfg.OpenApi.ApiVersion)
 		config.SchemasPath = ""
 		config.CreateHooks = nil
@@ -74,10 +68,13 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 				Description: server.Description,
 			})
 		}
-
 		r.Mux.Get("/openapi", swagger.Home)
 		config.Servers = serverList
 		config.DocsRenderer = huma.DocsRendererScalar
+	} else {
+		config = huma.DefaultConfig("", "")
+		config.DocsPath = ""
+		config.OpenAPIPath = ""
 	}
 
 	// Nota: la configurazione Security non è più presente nel Config corrente;
@@ -90,9 +87,13 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	}
 	r.Api = humachi.New(cm, config)
 
-	// GET /capabilities: espone le capability api/action_api del backend.
-	// Registrato su chi direttamente: no auth, non appare nell'OpenAPI spec.
-	cm.Get("/capabilities", capabilitiesHandler(r.Api))
+	// Endpoint di discovery: abilitati solo in develop-mode.
+	// Registrati su chi direttamente: no auth, non appaiono nell'OpenAPI spec.
+	if cfg.DevelopMode {
+		cm.Get("/capabilities", capabilitiesHandler(r.Api))
+		cm.Get("/capabilities.yaml", capabilitiesYAMLHandler(r.Api))
+		cm.Get("/acl.mongo.js", capabilitiesMongoHandler(r.Api))
+	}
 
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(TracingHandler)
