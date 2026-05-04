@@ -1,6 +1,7 @@
 package apiservices
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
@@ -138,4 +139,21 @@ var DefaultResponses = map[string]*huma.Response{
 func SerializeSchema(input interface{}) *huma.Schema {
 	return ApiRegistry.Schema(reflect.TypeOf(input), true, "")
 
+}
+
+func WithBusiness[D, Req, Resp any](dep D, fn func(context.Context, *Req, D) (*Resp, error)) func(context.Context, *Req) (*Resp, error) {
+	return func(ctx context.Context, req *Req) (*Resp, error) {
+		return fn(ctx, req, dep)
+	}
+}
+
+func RegisterWithBusiness[B, Req, Resp any](
+	api huma.API,
+	b B,
+	op huma.Operation,
+	fn func(context.Context, *Req, B) (*Resp, error),
+) {
+	huma.Register(api, op, func(ctx context.Context, req *Req) (*Resp, error) {
+		return fn(ctx, req, b)
+	})
 }
