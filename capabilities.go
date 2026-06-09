@@ -18,25 +18,25 @@ import (
 // operationId: operationId originale Huma per Match() nel backend; omesso se uguale a id
 // category:    "api" | "action_api"
 type capabilityEntry struct {
-	ID          string   `json:"id"`
-	Category    string   `json:"category"`
-	Description string   `json:"description,omitempty"`
-	OperationID string   `json:"operationId,omitempty"`
-	Path        string   `json:"path,omitempty"`
-	Methods     []string `json:"methods,omitempty"`
+	ID          string `json:"id"`
+	Category    string `json:"category"`
+	Description string `json:"description,omitempty"`
+	OperationID string `json:"operationId,omitempty"`
+	Endpoint    string `json:"endpoint,omitempty"`
+	Method      string `json:"method,omitempty"`
 }
 
 // capDefDoc è il documento cap-def per YAML/Mongo, allineato al formato ng-core-ui.
 type capDefDoc struct {
-	ID          string   `json:"_id"`
-	ET          string   `json:"_et"`
-	App         string   `json:"app"`
-	Category    string   `json:"category"`
-	Description string   `json:"description,omitempty"`
-	OperationID string   `json:"operationId,omitempty"`
-	Path        string   `json:"path,omitempty"`
-	Methods     []string `json:"methods,omitempty"`
-	SysInfo     string   `json:"sys_info"`
+	ID          string `json:"_id"`
+	ET          string `json:"_et"`
+	App         string `json:"app"`
+	Category    string `json:"category"`
+	Description string `json:"description,omitempty"`
+	OperationID string `json:"operationId,omitempty"`
+	Endpoint    string `json:"endpoint,omitempty"`
+	Method      string `json:"method,omitempty"`
+	SysInfo     string `json:"sys_info"`
 }
 
 // actionCapabilities raccoglie le capability action_api registrate dall'applicazione.
@@ -90,7 +90,7 @@ func capabilitiesMongoHandler(api huma.API) http.HandlerFunc {
 
 // capID costruisce l'_id strutturato per un capability entry: api:<appID>:<id>.
 func capID(appID, id string) string {
-	return fmt.Sprintf("api:%s:%s", appID, strings.ToLower(id))
+	return fmt.Sprintf("cap:%s:api:%s", appID, strings.ToLower(id))
 }
 
 // toCapabilitiesYAML serializza le capability nel formato cap_defs + cap_groups
@@ -110,14 +110,11 @@ func toCapabilitiesYAML(entries []capabilityEntry) string {
 		if e.OperationID != "" {
 			fmt.Fprintf(&sb, "    operationId: %q\n", e.OperationID)
 		}
-		if e.Path != "" {
-			fmt.Fprintf(&sb, "    path: %q\n", e.Path)
+		if e.Endpoint != "" {
+			fmt.Fprintf(&sb, "    endpoint: %q\n", e.Endpoint)
 		}
-		if len(e.Methods) > 0 {
-			sb.WriteString("    methods:\n")
-			for _, m := range e.Methods {
-				fmt.Fprintf(&sb, "      - %q\n", m)
-			}
+		if e.Method != "" {
+			fmt.Fprintf(&sb, "    method: %q\n", e.Method)
 		}
 	}
 
@@ -146,8 +143,8 @@ func toCapabilitiesMongo(entries []capabilityEntry) string {
 			Category:    e.Category,
 			Description: e.Description,
 			OperationID: e.OperationID,
-			Path:        e.Path,
-			Methods:     e.Methods,
+			Endpoint:    e.Endpoint,
+			Method:      e.Method,
 			SysInfo:     "__SYS_INFO__",
 		}
 		raw, _ := json.MarshalIndent(doc, "    ", "    ")
@@ -216,8 +213,8 @@ func buildEntries(api huma.API) []capabilityEntry {
 				ID:          capID,
 				Category:    "api",
 				Description: desc,
-				Path:        path,
-				Methods:     []string{mo.method},
+				Endpoint:    path,
+				Method:      mo.method,
 			}
 			if mo.op.OperationID != capID {
 				e.OperationID = mo.op.OperationID
