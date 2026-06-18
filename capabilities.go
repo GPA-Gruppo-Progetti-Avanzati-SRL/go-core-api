@@ -182,6 +182,75 @@ func jsonStr(s string) string {
 	return string(b)
 }
 
+// sqlStr wraps a string in single quotes with SQL-standard escaping (' → ”).
+func sqlStr(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
+}
+
+// capabilitiesSQLHandler serve GET /acl.sql → script INSERT upsert per SQL (PostgreSQL).
+func capabilitiesSQLHandler(api huma.API) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		entries := buildEntries(api)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(toCapabilitiesSQL(entries)))
+	}
+}
+
+// toCapabilitiesSQL serializza le capability come script INSERT ... ON CONFLICT upsert
+// per le tabelle opem_acl_cap_def, opem_acl_cap_group e opem_acl_cap_group_def.
+// Sintassi: PostgreSQL / SQLite (ON CONFLICT ... DO UPDATE / DO NOTHING).
+func toCapabilitiesSQL(entries []capabilityEntry) string {
+	appID := core.AppName
+	var sb strings.Builder
+
+	sb.WriteString("-- SQL seed: opem_acl_cap_def + opem_acl_cap_group + opem_acl_cap_group_def\n")
+	sb.WriteString("-- Sintassi: PostgreSQL / SQLite  (ON CONFLICT ... DO UPDATE / DO NOTHING)\n")
+	sb.WriteString("-- Generato da GET /acl.sql — idempotente.\n\n")
+
+	// ── cap_def ──────────────────────────────────────────────────────────────
+	sb.WriteString("-- cap_defs\n")
+	for _, e := range entries {
+		id := capID(appID, e.ID)
+		name := e.Description
+		if name == "" {
+			name = e.ID
+		}
+		fmt.Fprintf(&sb,
+			"INSERT INTO opem_acl_cap_def (id, app, category, description, name, endpoint, icon, ord, menu, mapping, method, status)\n"+
+				"VALUES (%s, %s, %s, %s, %s, %s, '', 0, FALSE, %s, %s, 'active')\n"+
+				"ON CONFLICT (id) DO UPDATE SET\n"+
+				"    app = EXCLUDED.app, category = EXCLUDED.category, description = EXCLUDED.description,\n"+
+				"    name = EXCLUDED.name, endpoint = EXCLUDED.endpoint, mapping = EXCLUDED.mapping,\n"+
+				"    method = EXCLUDED.method;\n\n",
+			sqlStr(id), sqlStr(appID), sqlStr(e.Category), sqlStr(e.Description),
+			sqlStr(name), sqlStr(e.Endpoint), sqlStr(e.OperationID), sqlStr(e.Method),
+		)
+	}
+
+	// ── cap_group ─────────────────────────────────────────────────────────────
+	groupID := fmt.Sprintf("grp:%s:ALL", appID)
+	sb.WriteString("-- cap_group\n")
+	fmt.Fprintf(&sb,
+		"INSERT INTO opem_acl_cap_group (id, description, status)\n"+
+			"VALUES (%s, '', 'active')\n"+
+			"ON CONFLICT (id) DO UPDATE SET description = EXCLUDED.description, status = EXCLUDED.status;\n\n",
+		sqlStr(groupID),
+	)
+
+	// ── cap_group_def (junction) ──────────────────────────────────────────────
+	sb.WriteString("-- cap_group_def\n")
+	for _, e := range entries {
+		fmt.Fprintf(&sb,
+			"INSERT INTO opem_acl_cap_group_def (cap_group_id, cap_def_id) VALUES (%s, %s)\n"+
+				"ON CONFLICT (cap_group_id, cap_def_id) DO NOTHING;\n",
+			sqlStr(groupID), sqlStr(capID(appID, e.ID)),
+		)
+	}
+
+	return sb.String()
+}
+
 // buildEntries costruisce le capabilityEntry dalle operazioni Huma + action_api registrate.
 func buildEntries(api huma.API) []capabilityEntry {
 	openapi := api.OpenAPI()

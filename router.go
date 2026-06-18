@@ -94,6 +94,7 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 		cm.Get("/capabilities", capabilitiesHandler(r.Api))
 		cm.Get("/capabilities.yaml", capabilitiesYAMLHandler(r.Api))
 		cm.Get("/acl.mongo.js", capabilitiesMongoHandler(r.Api))
+		cm.Get("/acl.sql", capabilitiesSQLHandler(r.Api))
 	}
 
 	r.Api.UseMiddleware(reporter.MetricsHandler)
