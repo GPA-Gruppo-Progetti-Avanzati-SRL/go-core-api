@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app v0.0.25
 	github.com/danielgtaylor/huma/v2 v2.38.0
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/rs/zerolog v1.35.1
 	github.com/slok/go-http-metrics v0.13.0
