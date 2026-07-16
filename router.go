@@ -76,6 +76,12 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 		config = huma.DefaultConfig("", "")
 		config.DocsPath = ""
 		config.OpenAPIPath = ""
+		// Senza OpenAPI esposta non serve lo SchemaLinkTransformer (aggiunto dai
+		// CreateHooks di huma.DefaultConfig). Lasciarlo attivo lo farebbe girare a
+		// ogni registrazione operazione e andrebbe in nil-pointer panic sugli schema
+		// ($ref) che puntano ad ApiRegistry, non presente nel registry di questa
+		// config. Lo disattiviamo come nel ramo develop-mode:true.
+		config.CreateHooks = nil
 	}
 
 	// Nota: la configurazione Security non è più presente nel Config corrente;
