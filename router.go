@@ -93,6 +93,7 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	}),
 	}
 	r.Api = humachi.New(cm, config)
+	defaultApi = r.Api
 
 	// Endpoint di discovery: abilitati solo in develop-mode.
 	// Registrati su chi direttamente: no auth, non appaiono nell'OpenAPI spec.
@@ -135,6 +136,11 @@ func AuthorizerInjector(auth coreauth.Authorizer) func(huma.Context, func(huma.C
 
 var ApiRegistry = huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)
 
+// defaultApi è l'istanza huma.API dell'ultima NewRouter costruita. Poiché per
+// processo esiste una sola API, RegisterWithBusiness la usa implicitamente così
+// il chiamante non deve passarla ad ogni registrazione.
+var defaultApi huma.API
+
 var DefaultResponses = map[string]*huma.Response{
 	"400": {Ref: "", Description: "BadRequest/Validation Error", Content: ErrorContent, Links: nil, Extensions: nil},
 	"404": {Ref: "", Description: "Not Found", Content: ErrorContent, Links: nil, Extensions: nil},
@@ -155,12 +161,14 @@ func WithBusiness[D, Req, Resp any](dep D, fn func(context.Context, *Req, D) (*R
 }
 
 func RegisterWithBusiness[B, Req, Resp any](
-	api huma.API,
 	b B,
 	op huma.Operation,
 	fn func(context.Context, *Req, B) (*Resp, error),
 ) {
-	huma.Register(api, op, func(ctx context.Context, req *Req) (*Resp, error) {
+	if defaultApi == nil {
+		panic("apiservices: RegisterWithBusiness chiamata prima di NewRouter")
+	}
+	huma.Register(defaultApi, op, func(ctx context.Context, req *Req) (*Resp, error) {
 		return fn(ctx, req, b)
 	})
 }
