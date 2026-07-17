@@ -3,6 +3,7 @@ package apiservices
 import (
 	"context"
 	"reflect"
+	"sync"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
@@ -93,7 +94,6 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	}),
 	}
 	r.Api = humachi.New(cm, config)
-	defaultApi = r.Api
 
 	// Endpoint di discovery: abilitati solo in develop-mode.
 	// Registrati su chi direttamente: no auth, non appaiono nell'OpenAPI spec.
@@ -120,6 +120,10 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	}
 	r.Api.UseMiddleware(r.ValidatorHandler)
 	ConfigureError()
+	// Pubblica l'API e applica le registrazioni eventualmente accodate prima che
+	// NewRouter girasse (le UseMiddleware sopra sono a livello API, quindi valgono
+	// anche per le operazioni registrate nel flush).
+	setDefaultApi(r.Api)
 	return r
 }
 
@@ -139,7 +143,42 @@ var ApiRegistry = huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchem
 // defaultApi è l'istanza huma.API dell'ultima NewRouter costruita. Poiché per
 // processo esiste una sola API, RegisterWithBusiness la usa implicitamente così
 // il chiamante non deve passarla ad ogni registrazione.
-var defaultApi huma.API
+//
+// La registrazione è indipendente dall'ordine di boot fx: se una NewRouter di
+// route gira prima di apiservices.NewRouter (nessun arco di dipendenza che ne
+// forzi l'ordine, dato che ora non si passa più il Router), le registrazioni
+// vengono accodate in pendingRegistrations e applicate quando NewRouter imposta
+// l'API tramite setDefaultApi.
+var (
+	apiMu                sync.Mutex
+	defaultApi           huma.API
+	pendingRegistrations []func(huma.API)
+)
+
+// registerOrDefer applica reg subito se l'API è già pronta, altrimenti la accoda.
+func registerOrDefer(reg func(huma.API)) {
+	apiMu.Lock()
+	if defaultApi != nil {
+		api := defaultApi
+		apiMu.Unlock()
+		reg(api)
+		return
+	}
+	pendingRegistrations = append(pendingRegistrations, reg)
+	apiMu.Unlock()
+}
+
+// setDefaultApi imposta l'API di processo e drena le registrazioni in attesa.
+func setDefaultApi(api huma.API) {
+	apiMu.Lock()
+	defaultApi = api
+	pending := pendingRegistrations
+	pendingRegistrations = nil
+	apiMu.Unlock()
+	for _, reg := range pending {
+		reg(api)
+	}
+}
 
 var DefaultResponses = map[string]*huma.Response{
 	"400": {Ref: "", Description: "BadRequest/Validation Error", Content: ErrorContent, Links: nil, Extensions: nil},
@@ -165,10 +204,9 @@ func RegisterWithBusiness[B, Req, Resp any](
 	op huma.Operation,
 	fn func(context.Context, *Req, B) (*Resp, error),
 ) {
-	if defaultApi == nil {
-		panic("apiservices: RegisterWithBusiness chiamata prima di NewRouter")
-	}
-	huma.Register(defaultApi, op, func(ctx context.Context, req *Req) (*Resp, error) {
-		return fn(ctx, req, b)
+	registerOrDefer(func(api huma.API) {
+		huma.Register(api, op, func(ctx context.Context, req *Req) (*Resp, error) {
+			return fn(ctx, req, b)
+		})
 	})
 }
