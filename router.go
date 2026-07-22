@@ -48,7 +48,7 @@ type Matcher struct {
 	Authorizer coreauth.Authorizer `optional:"true"`
 }
 
-func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
+func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	r := &Router{
 		Mux: cm,
 	}
@@ -104,11 +104,11 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 	}
 
 	r.Api.UseMiddleware(reporter.MetricsHandler)
-	r.Api.UseMiddleware(TracingHandler)
+	r.Api.UseMiddleware(tracingHandler)
 	if cfg.Authorization != nil && cfg.Authorization.Enabled {
 		// Inject authorizer in context for downstream middlewares/handlers
 		if matcher.Authorizer != nil {
-			r.Api.UseMiddleware(AuthorizerInjector(matcher.Authorizer))
+			r.Api.UseMiddleware(authorizerInjector(matcher.Authorizer))
 			r.Api.UseMiddleware(authorization.AuthorizationHandler(cfg.Authorization))
 			// Register standalone handlers (decoupled from Router)
 			huma.Register(r.Api, authorization.TokenOperation, authorization.Token)
@@ -118,13 +118,13 @@ func NewRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 
 	}
 	r.Api.UseMiddleware(r.ValidatorHandler)
-	ConfigureError()
+	configureError()
 	return r
 }
 
-// AuthorizerInjector injects the provided Authorizer into the request context so that
+// authorizerInjector injects the provided Authorizer into the request context so that
 // downstream middlewares and handlers can retrieve it without binding to Router.
-func AuthorizerInjector(auth coreauth.Authorizer) func(huma.Context, func(huma.Context)) {
+func authorizerInjector(auth coreauth.Authorizer) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		if auth != nil {
 			ctx = huma.WithValue(ctx, "authorizer", auth)

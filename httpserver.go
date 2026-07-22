@@ -14,7 +14,7 @@ import (
 	"go.uber.org/fx"
 )
 
-func NewService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
+func newService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
 	mux := chi.NewRouter()
 	server := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 

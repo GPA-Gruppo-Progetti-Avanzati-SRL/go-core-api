@@ -17,7 +17,7 @@ func TestOpenApiDisabled(t *testing.T) {
 		OpenApi: nil,
 	}
 
-	_ = NewRouter(mux, cfg, Matcher{})
+	_ = newRouter(mux, cfg, Matcher{})
 
 	req, _ := http.NewRequest("GET", "/openapi", nil)
 	rr := httptest.NewRecorder()
@@ -45,7 +45,7 @@ func TestOpenApiEnabled(t *testing.T) {
 		},
 	}
 
-	router := NewRouter(mux, cfg, Matcher{})
+	router := newRouter(mux, cfg, Matcher{})
 
 	req, _ := http.NewRequest("GET", "/openapi", nil)
 	rr := httptest.NewRecorder()

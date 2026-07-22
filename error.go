@@ -43,7 +43,7 @@ func (e *DefaultError) GetStatus() int {
 	return e.Status
 }
 
-func ConfigureError() {
+func configureError() {
 	orig := huma.NewError
 	huma.NewError = func(status int, message string, errs ...error) huma.StatusError {
 		if len(errs) > 0 {

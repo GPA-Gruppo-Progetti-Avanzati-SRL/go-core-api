@@ -14,7 +14,7 @@ import (
 	"strconv"
 )
 
-func TracingHandler(ctx huma.Context, next func(huma.Context)) {
+func tracingHandler(ctx huma.Context, next func(huma.Context)) {
 
 	headers := http.Header{}
 	attributes := make([]attribute.KeyValue, 0)
