@@ -21,7 +21,7 @@ func Module(cfg *Config) {
 // ModuleIf è come Module ma attivo solo quando core.Mode è tra i modes indicati.
 func ModuleIf(cfg *Config, modes ...string) {
 	core.SupplyIf(cfg, modes...)
-	core.ProvidesIf(newService, modes...)
-	core.ProvidesIf(newRouter, modes...)
+	core.ProvideIf(newService, modes...)
+	core.ProvideIf(newRouter, modes...)
 
 }
