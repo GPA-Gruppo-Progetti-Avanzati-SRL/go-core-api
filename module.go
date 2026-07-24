@@ -9,12 +9,17 @@ import (
 // l'app non deve più fare core.Supply. I costruttori concreti (newService/newRouter)
 // non sono esportati: l'unico entry-point è Module().
 //
-// L'Invoke su *Router forza la costruzione di Router → Mux → avvio del server HTTP
-// anche prima che l'app registri le operation Huma. L'Authorizer resta opzionale
-// (Matcher, fornito dall'app se l'autorizzazione è abilitata).
+// Le registrazioni sono raggruppate in un fx.Module("api") per il namespacing del
+// grafo/log fx (nessun fx.Private: i provide restano visibili all'app, così *Router
+// e *chi.Mux sono consumabili dai siti di registrazione delle operation Huma
+// dell'app). NON c'è un Invoke interno che forza la costruzione: è l'app, registrando
+// le operation su *Router (o consumandolo), a farlo costruire (lazy). L'Authorizer
+// resta opzionale (Matcher, fornito dall'app se l'autorizzazione è abilitata).
 // Se modes è vuoto registra sempre; altrimenti solo quando core.Mode è tra i modes indicati.
 func Module(cfg *Config, modes ...string) {
-	core.Supply(cfg, modes...)
-	core.Provide(newService, modes...)
-	core.Provide(newRouter, modes...)
+	core.Module("api", func() {
+		core.Supply(cfg, modes...)
+		core.Provide(newService, modes...)
+		core.Provide(newRouter, modes...)
+	})
 }
