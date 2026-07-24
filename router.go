@@ -15,7 +15,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
-	"go.uber.org/fx"
 )
 
 // idempotentRegisterer wraps a prometheus.Registerer to silently ignore
@@ -44,7 +43,7 @@ type Router struct {
 	Mux *chi.Mux
 }
 type Matcher struct {
-	fx.In
+	core.In
 	Authorizer coreauth.Authorizer `optional:"true"`
 }
 
