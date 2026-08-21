@@ -9,7 +9,13 @@ import (
 type Config struct {
 	Host string        `yaml:"host" mapstructure:"host" json:"host"`
 	Port int           `yaml:"port" mapstructure:"port" json:"port"`
-	Idle time.Duration `yaml:"idle" mapstructure:"idle" json:"idle" yaml:"idle"`
+	Idle time.Duration `yaml:"idle" mapstructure:"idle" json:"idle"`
+
+	// MaxHeaderValueCount limita il numero di header value accettati per
+	// richiesta (net/http Server.MaxHeaderValueCount, Go 1.27+): protezione
+	// contro le richieste con migliaia di header. A 0 vale il default di
+	// net/http (DefaultMaxHeaderValueCount = 500).
+	MaxHeaderValueCount int `yaml:"max-header-value-count" mapstructure:"max-header-value-count" json:"max-header-value-count"`
 
 	// DevelopMode abilita gli endpoint diagnostici/discovery (/openapi, /capabilities).
 	// Default false: in produzione questi path non sono esposti.

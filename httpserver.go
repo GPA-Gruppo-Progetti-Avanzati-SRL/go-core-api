@@ -24,7 +24,14 @@ func newService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
 	if cfg.Idle == 0 {
 		cfg.Idle = 30 * time.Second
 	}
-	srv := &http.Server{Addr: server, Handler: mux, IdleTimeout: cfg.Idle}
+	srv := &http.Server{
+		Addr:        server,
+		Handler:     mux,
+		IdleTimeout: cfg.Idle,
+		// A 0 net/http applica DefaultMaxHeaderValueCount: nessun default da
+		// duplicare qui.
+		MaxHeaderValueCount: cfg.MaxHeaderValueCount,
+	}
 
 	lc.Append(fx.Hook{
 

@@ -142,7 +142,7 @@ var DefaultResponses = map[string]*huma.Response{
 	"500": {Ref: "", Description: "Internal Server Error", Content: ErrorContent, Links: nil, Extensions: nil},
 }
 
-func SerializeSchema(input interface{}) *huma.Schema {
+func SerializeSchema(input any) *huma.Schema {
 	return ApiRegistry.Schema(reflect.TypeOf(input), true, "")
 
 }
