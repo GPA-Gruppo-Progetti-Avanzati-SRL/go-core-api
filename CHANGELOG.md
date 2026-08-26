@@ -4,6 +4,9 @@ Tutte le modifiche note di tutti i tag della libreria.
 
 Formato: Versione (Data) — elenco dei commit inclusi tra il tag precedente e quello corrente.
 
+## Non rilasciato
+- `RegisterWithBusiness` merge le `DefaultResponses` nell'operazione registrata (copia difensiva di mappa e `*huma.Response`, le chiavi dell'op vincono): i file operazione dell'app non hanno più bisogno di `var xxxResponses` + `init()` con `maps.Copy`. Retrocompatibile con le app che lo fanno ancora.
+
 ## v0.0.10 — 2025-09-29
 - b417013 — Reorder imports and move `/metrics` handler initialization inside `OnStart`. Add `/health` endpoint.
 

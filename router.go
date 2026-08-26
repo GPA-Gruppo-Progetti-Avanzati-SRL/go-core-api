@@ -2,6 +2,7 @@ package apiservices
 
 import (
 	"context"
+	"maps"
 	"reflect"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
@@ -110,7 +111,7 @@ func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 			r.Api.UseMiddleware(authorizerInjector(matcher.Authorizer))
 			r.Api.UseMiddleware(authorization.AuthorizationHandler(cfg.Authorization))
 			// Register standalone handlers (decoupled from Router)
-			huma.Register(r.Api, authorization.TokenOperation, authorization.Token)
+			huma.Register(r.Api, withDefaultResponses(authorization.TokenOperation), authorization.Token)
 		} else {
 			log.Fatal().Msg("No authorization operator  specified so i can't register the authorization middleware")
 		}
@@ -142,6 +143,28 @@ var DefaultResponses = map[string]*huma.Response{
 	"500": {Ref: "", Description: "Internal Server Error", Content: ErrorContent, Links: nil, Extensions: nil},
 }
 
+// withDefaultResponses ritorna op con le DefaultResponses mergiate nelle sue
+// Responses: le chiavi dichiarate sull'operazione vincono sui default. È qui
+// perché l'app non deve più farlo a mano in ogni file operazione (la vecchia
+// coppia var Responses + init() con maps.Copy).
+//
+// La mappa ritornata è sempre NUOVA e ogni *huma.Response è una copia del
+// valore: huma.Register scrive dentro op.Responses (schema di Output.Body,
+// header e Description dello status di successo), quindi condividere la mappa
+// o i singoli Response fra operazioni farebbe documentare la seconda op con lo
+// schema della prima — e con registrazioni concorrenti sarebbe un concurrent
+// map write.
+func withDefaultResponses(op huma.Operation) huma.Operation {
+	merged := make(map[string]*huma.Response, len(DefaultResponses)+len(op.Responses))
+	for code, r := range DefaultResponses {
+		cp := *r
+		merged[code] = &cp
+	}
+	maps.Copy(merged, op.Responses)
+	op.Responses = merged
+	return op
+}
+
 func SerializeSchema(input any) *huma.Schema {
 	return ApiRegistry.Schema(reflect.TypeOf(input), true, "")
 
@@ -159,13 +182,17 @@ func WithBusiness[D, Req, Resp any](dep D, fn func(context.Context, *Req, D) (*R
 // costruttore è lazy e mode-gated) e ne garantisce la costruzione prima della
 // registrazione. Prendere il Router — non un'API globale — permette anche di avere
 // più router nello stesso processo.
+//
+// Le DefaultResponses (gli errori standard con schema DefaultError) sono
+// mergiate qui: l'operazione dell'app non deve dichiararle, e può comunque
+// ridefinire un singolo codice mettendolo nelle sue Responses.
 func RegisterWithBusiness[B, Req, Resp any](
 	r *Router,
 	b B,
 	op huma.Operation,
 	fn func(context.Context, *Req, B) (*Resp, error),
 ) {
-	huma.Register(r.Api, op, func(ctx context.Context, req *Req) (*Resp, error) {
+	huma.Register(r.Api, withDefaultResponses(op), func(ctx context.Context, req *Req) (*Resp, error) {
 		return fn(ctx, req, b)
 	})
 }
