@@ -56,10 +56,12 @@ var invoke = core.Invoke
 // WithRoutes — quindi l'app non deve più dichiarare un tipo Router wrapper con il suo costruttore
 // solo per creare il nodo fx che innesca le registrazioni.
 //
-// Le registrazioni sono raggruppate in un fx.Module("api") per il namespacing del grafo/log fx
-// (nessun fx.Private: i provide restano visibili all'app, così *Router e *chi.Mux sono consumabili
-// anche direttamente, e i business dell'app restano risolvibili dagli invoke del modulo).
-// L'Authorizer resta opzionale (Matcher, fornito dall'app se l'autorizzazione è abilitata).
+// Le registrazioni sono raggruppate in un core.ModuleClosed("api"): l'API è un sottosistema chiuso
+// — consuma i seam dell'app (le rotte con il loro business) e non le espone nulla in cambio, quindi
+// *Config, *Router, *chi.Mux e il server HTTP sono privati al modulo e non iniettabili dal grafo
+// dell'app (il *Router arriva alle Register come parametro, che è il solo modo in cui serve). Il
+// business dell'app è fornito a root e resta risolvibile dagli invoke del modulo, che ne è
+// discendente. L'Authorizer resta opzionale (Matcher, fornito dall'app se l'autorizzazione è abilitata).
 //
 // Senza alcun WithRoutes non c'è nessun invoke: il Router (e con lui il server) si costruisce solo
 // se qualcuno lo consuma — comportamento storico, invariato.
@@ -69,7 +71,7 @@ func Module(cfg *Config, opts ...Option) {
 		opt(&o)
 	}
 
-	core.Module("api", func() {
+	core.ModuleClosed("api", func() {
 		core.Supply(cfg, o.modes...)
 		core.Provide(newService, o.modes...)
 		core.Provide(newRouter, o.modes...)
