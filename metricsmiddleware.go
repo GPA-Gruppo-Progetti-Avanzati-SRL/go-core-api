@@ -1,4 +1,4 @@
-package apiservices
+package coreapi
 
 import (
 	"context"

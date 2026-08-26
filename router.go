@@ -1,4 +1,4 @@
-package apiservices
+package coreapi
 
 import (
 	"context"
@@ -135,7 +135,7 @@ func authorizerInjector(auth coreauth.Authorizer) func(huma.Context, func(huma.C
 
 var ApiRegistry = huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)
 
-var DefaultResponses = map[string]*huma.Response{
+var DefaultResponses = map[string]*Response{
 	"400": {Ref: "", Description: "BadRequest/Validation Error", Content: ErrorContent, Links: nil, Extensions: nil},
 	"404": {Ref: "", Description: "Not Found", Content: ErrorContent, Links: nil, Extensions: nil},
 	"408": {Ref: "", Description: "Request Timeout", Content: nil, Links: nil, Extensions: nil},
@@ -154,8 +154,8 @@ var DefaultResponses = map[string]*huma.Response{
 // o i singoli Response fra operazioni farebbe documentare la seconda op con lo
 // schema della prima — e con registrazioni concorrenti sarebbe un concurrent
 // map write.
-func withDefaultResponses(op huma.Operation) huma.Operation {
-	merged := make(map[string]*huma.Response, len(DefaultResponses)+len(op.Responses))
+func withDefaultResponses(op Operation) Operation {
+	merged := make(map[string]*Response, len(DefaultResponses)+len(op.Responses))
 	for code, r := range DefaultResponses {
 		cp := *r
 		merged[code] = &cp
@@ -165,7 +165,7 @@ func withDefaultResponses(op huma.Operation) huma.Operation {
 	return op
 }
 
-func SerializeSchema(input any) *huma.Schema {
+func SerializeSchema(input any) *Schema {
 	return ApiRegistry.Schema(reflect.TypeOf(input), true, "")
 
 }
@@ -189,7 +189,7 @@ func WithBusiness[D, Req, Resp any](dep D, fn func(context.Context, *Req, D) (*R
 func RegisterWithBusiness[B, Req, Resp any](
 	r *Router,
 	b B,
-	op huma.Operation,
+	op Operation,
 	fn func(context.Context, *Req, B) (*Resp, error),
 ) {
 	huma.Register(r.Api, withDefaultResponses(op), func(ctx context.Context, req *Req) (*Resp, error) {

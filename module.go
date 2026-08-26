@@ -1,4 +1,4 @@
-package apiservices
+package coreapi
 
 import (
 	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"

@@ -1,4 +1,4 @@
-package apiservices
+package coreapi
 
 import (
 	"errors"
@@ -24,7 +24,7 @@ func ManageBusinessError(e *core.ApplicationError) error {
 	}
 }
 
-var ErrorContent = map[string]*huma.MediaType{ApplicationJson: {
+var ErrorContent = map[string]*MediaType{ApplicationJson: {
 	Schema: SerializeSchema(DefaultError{}),
 }}
 
