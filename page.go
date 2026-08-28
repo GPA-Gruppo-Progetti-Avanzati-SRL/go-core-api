@@ -26,7 +26,7 @@ type PagingRequest struct {
 func (p *PagingRequest) GetSort() (page.SortRequest, *core.ApplicationError) {
 	s, err := page.ParseSort(p.Sort)
 	if err != nil {
-		return nil, core.BusinessError().WithCode("ERR-SORT").WithCause(err)
+		return nil, core.BusinessError().WithAmbit(Ambit).WithCode(CodeSort).WithCause(err)
 	}
 	return s, nil
 }

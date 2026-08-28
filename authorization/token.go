@@ -109,7 +109,7 @@ func Token(ctx context.Context, i *tokenRequest) (*RawStringOutput, error) {
 
 	cipherText, err := core.Encrypt(b, i.AppID)
 	if err != nil {
-		return nil, huma.Error500InternalServerError("encryption error", err)
+		return nil, core.TechnicalError().WithAmbit(ambit).WithCode(CodeTokenEncryption).WithCause(err)
 	}
 
 	return &RawStringOutput{Body: []byte(hex.EncodeToString(cipherText)), ContentType: "text/plain"}, nil

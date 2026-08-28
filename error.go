@@ -8,6 +8,15 @@ import (
 
 const ApplicationJson = "application/json"
 
+// Ambit è la libreria di origine dell'errore: i costruttori di core riempiono Ambit con
+// l'AppName, cioè con l'app che l'errore lo riceve, quindi un errore nato qui deve dirlo.
+const Ambit = "go-core-api"
+
+// Codici emessi dal modulo. Tutti finiscono nel campo `code` del DefaultError.
+const (
+	CodeSort = "ERR-SORT" // query param `sort` non parsabile
+)
+
 func ManageBusinessError(e *core.ApplicationError) error {
 
 	switch e.StatusCode {
@@ -66,7 +75,7 @@ func configureError() {
 				Status:  400,
 				Code:    core.ErrValidation,
 				Message: message + " " + errors.Join(errs...).Error(),
-				Ambit:   "VALIDATION",
+				Ambit:   Ambit,
 			}
 		}
 		return orig(status, message, errs...)

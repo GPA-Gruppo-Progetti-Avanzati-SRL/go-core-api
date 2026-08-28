@@ -1,6 +1,7 @@
 package authorization
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 
@@ -123,14 +124,33 @@ func parseRoles(v, delimiter string) []string {
 	return out
 }
 
+// ambit e codici dei rifiuti di autorizzazione. Il package non importa il root di coreapi (è
+// il root a importare questo), quindi l'ambit è ripetuto invece che condiviso.
+const (
+	ambit               = "go-core-api"
+	CodeForbiddenRole   = "API-FORBIDDEN"     // nessuno dei ruoli presentati abilita la rotta
+	CodeForbiddenCtx    = "API-CTX-FORBIDDEN" // il context header non è autorizzato
+	CodeTokenEncryption = "API-TOKEN-CRYPT"   // cifratura del token fallita
+)
+
+// deny scrive il 403 nella STESSA forma del DefaultError di coreapi (ambit/code/message):
+// prima usciva un `{"error":"forbidden",...}` che nessun client poteva trattare come gli altri
+// errori dell'API, ed era l'unica risposta d'errore senza codice.
 func deny(ctx huma.Context) {
-	ctx.SetStatus(http.StatusForbidden)
-	ctx.SetHeader("Content-Type", "application/json")
-	_, _ = ctx.BodyWriter().Write([]byte(`{"error":"forbidden","message":"missing required role"}`))
+	writeForbidden(ctx, CodeForbiddenRole, "missing required role")
 }
 
 func denyContext(ctx huma.Context) {
+	writeForbidden(ctx, CodeForbiddenCtx, "context not authorized")
+}
+
+func writeForbidden(ctx huma.Context, code, message string) {
 	ctx.SetStatus(http.StatusForbidden)
 	ctx.SetHeader("Content-Type", "application/json")
-	_, _ = ctx.BodyWriter().Write([]byte(`{"error":"forbidden","message":"context not authorized"}`))
+	body, _ := json.Marshal(struct {
+		Ambit   string `json:"ambit"`
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	}{ambit, code, message})
+	_, _ = ctx.BodyWriter().Write(body)
 }
