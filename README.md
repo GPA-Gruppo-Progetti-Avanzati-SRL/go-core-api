@@ -178,6 +178,12 @@ type uploadInput struct {
 
 ## Errori
 
+Codici emessi dalla libreria: **[ERRORI.md](ERRORI.md)** (`coreapi.Ambit` = `"go-core-api"`). Nota che
+il **403 del middleware di autorizzazione** ha ora la stessa forma degli altri errori — `DefaultError`
+con `ambit`/`code`/`message`, codici `API-FORBIDDEN` e `API-CTX-FORBIDDEN` — mentre prima era un
+`{"error":"forbidden",...}` senza codice, l'unica risposta d'errore che un client non potesse trattare
+come le altre.
+
 ```go
 func ManageBusinessError(e *core.ApplicationError) error
 ```
