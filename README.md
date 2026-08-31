@@ -261,6 +261,7 @@ In `develop-mode` il server espone gli endpoint di discovery, utili per generare
 | `/acl.mongo.js` | script di seed per la collection ACL Mongo |
 | `/acl.sql` | INSERT di seed per il backend SQL |
 | `/openapi` | Swagger/Scalar UI |
+| `/debug/pprof/*` | profili runtime (`goroutine`, `goroutineleak`, `heap`, `profile`, …) |
 
 Sono registrati direttamente su chi: niente auth, e non appaiono nella spec OpenAPI.
 
@@ -297,6 +298,12 @@ config:
 
 **`develop-mode` è false di default**: in produzione `/openapi` e gli endpoint di discovery non sono
 esposti, e lo `SchemaLinkTransformer` di huma è disattivato insieme a loro.
+
+Per `/debug/pprof/*` questo è l'**unico** gate, e non è un dettaglio: qui la porta è quella
+**pubblica** dell'API, condivisa con le rotte applicative, quindi un pprof sempre acceso
+regalerebbe a chiunque raggiunga il servizio `/debug/pprof/profile?seconds=N` (CPU-burn) e
+`/debug/pprof/heap` (può contenere segreti). Nei processi **senza** API il gate è invece
+`metrics.pprof: true` di go-core-app, sul server ops `:2112`.
 
 `max-header-value-count` è il `Server.MaxHeaderValueCount` di net/http (Go 1.27+): protezione contro
 le richieste con migliaia di header.

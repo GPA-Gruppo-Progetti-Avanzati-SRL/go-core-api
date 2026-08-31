@@ -21,11 +21,11 @@ func AuthorizationHandler(cfg *Config) func(huma.Context, func(huma.Context)) {
 	userHeader := "X-User"
 	delimiter := ","
 
-	guestPaths := map[string]struct{}{
-		"/openapi": {},
-		"/metrics": {},
-		"/health":  {},
-	}
+	// Nessun default: "/openapi", "/metrics" e "/health" sono rotte chi native
+	// (montate fuori da huma.API) e non attraversano mai questo middleware, quindi
+	// includerle qui era codice morto. GuestPaths resta per operazioni huma reali
+	// che un'app vuole escludere dall'autorizzazione.
+	guestPaths := map[string]struct{}{}
 	if cfg != nil {
 		if cfg.RolesHeader != "" {
 			rolesHeader = cfg.RolesHeader

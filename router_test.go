@@ -227,3 +227,38 @@ func TestAliasOnlyRegistration(t *testing.T) {
 	assert.Contains(t, post.RequestBody.Content, "multipart/form-data",
 		"huma deve riconoscere il multipart dal tipo concreto preservato dall'alias")
 }
+
+// TestPprofSoloInDevelopMode: in mode API la porta è quella pubblica, condivisa con le rotte
+// dell'applicazione, quindi develop-mode è l'unico gate di /debug/pprof/* e in produzione
+// (develop-mode: false, il default) gli endpoint non devono essere registrati affatto.
+func TestPprofSoloInDevelopMode(t *testing.T) {
+	paths := []string{
+		"/debug/pprof/",
+		"/debug/pprof/goroutineleak?debug=1",
+		"/debug/pprof/cmdline",
+	}
+
+	t.Run("develop-mode false: non esposto", func(t *testing.T) {
+		mux := chi.NewRouter()
+		_ = newRouter(mux, &Config{}, Matcher{})
+
+		for _, p := range paths {
+			req, _ := http.NewRequest("GET", p, nil)
+			rr := httptest.NewRecorder()
+			mux.ServeHTTP(rr, req)
+			assert.Equal(t, http.StatusNotFound, rr.Code, "GET %s deve essere 404 senza develop-mode", p)
+		}
+	})
+
+	t.Run("develop-mode true: esposto", func(t *testing.T) {
+		mux := chi.NewRouter()
+		_ = newRouter(mux, &Config{DevelopMode: true}, Matcher{})
+
+		for _, p := range paths {
+			req, _ := http.NewRequest("GET", p, nil)
+			rr := httptest.NewRecorder()
+			mux.ServeHTTP(rr, req)
+			assert.Equal(t, http.StatusOK, rr.Code, "GET %s deve essere servito in develop-mode", p)
+		}
+	})
+}

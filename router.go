@@ -101,6 +101,11 @@ func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 		cm.Get("/capabilities.yaml", capabilitiesYAMLHandler(r.Api))
 		cm.Get("/acl.mongo.js", capabilitiesMongoHandler(r.Api))
 		cm.Get("/acl.sql", capabilitiesSQLHandler(r.Api))
+		// pprof sta qui e non su httpserver.go perché in mode API la porta è quella PUBBLICA,
+		// condivisa con le rotte dell'applicazione: develop-mode è l'unico gate, quindi in
+		// produzione (develop-mode: false) /debug/pprof/* non è proprio registrato.
+		// L'equivalente per i processi senza API è `metrics.pprof` di go-core-app, sulla 2112.
+		cm.Mount("/debug/pprof", core.ProfilingHandler())
 	}
 
 	r.Api.UseMiddleware(reporter.MetricsHandler)
