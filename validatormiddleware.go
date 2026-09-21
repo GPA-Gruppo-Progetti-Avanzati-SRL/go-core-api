@@ -50,8 +50,17 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 		if verr := core.ValidateStruct(input); verr != nil {
 			vc.SetHeader("Content-Type", "application/json")
 			vc.SetStatus(400)
-			bitErrResposnse, _ := json.Marshal(verr)
-			vc.BodyWriter().Write(bitErrResposnse)
+			bitErrResposnse, merr := json.Marshal(verr)
+			if merr != nil {
+				log.Error().Err(merr).Msg("serializzazione della risposta di validazione fallita")
+				return
+			}
+			// Status e header sono già stati scritti: un errore qui non è più riportabile al
+			// client, ma dice che la 400 non è arrivata — e chi legge i log del client vedrebbe
+			// altrimenti una risposta vuota senza spiegazione.
+			if _, werr := vc.BodyWriter().Write(bitErrResposnse); werr != nil {
+				log.Warn().Err(werr).Msg("invio della risposta di validazione non completato")
+			}
 			return
 		}
 	}
@@ -109,11 +118,25 @@ func (r *ValidatorContext) EachHeader(cb func(name string, value string)) {
 func (r *ValidatorContext) BodyReader() io.Reader {
 
 	if r.br != nil {
-		r.br.Seek(0, 0)
+		// Riavvolge il body già letto perché il prossimo lettore (l'handler, dopo il
+		// middleware) lo trovi da capo. Su un bytes.Reader l'errore non è raggiungibile, ma se
+		// lo fosse il lettore successivo leggerebbe un body troncato senza accorgersene.
+		if _, err := r.br.Seek(0, io.SeekStart); err != nil {
+			log.Error().Err(err).Msg("riavvolgimento del body fallito: il prossimo lettore vedrà un body parziale")
+		}
 		return r.br
 	}
-	b, _ := io.ReadAll(r.c.BodyReader())
-	r.c.SetReadDeadline(time.Time{})
+	b, err := io.ReadAll(r.c.BodyReader())
+	if err != nil {
+		// Il body letto resta quello parziale: la validazione lo vedrà così, ed è l'unico
+		// punto in cui si può sapere che era troncato e non semplicemente malformato.
+		log.Warn().Err(err).Msg("lettura del body incompleta")
+	}
+	// La deadline di lettura viene tolta perché il body è già in memoria: da qui in poi
+	// nessun handler deve più aspettare la rete.
+	if err := r.c.SetReadDeadline(time.Time{}); err != nil {
+		log.Warn().Err(err).Msg("rimozione della read deadline fallita")
+	}
 	r.br = bytes.NewReader(b)
 	return r.br
 

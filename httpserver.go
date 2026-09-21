@@ -2,6 +2,7 @@ package coreapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -43,7 +44,16 @@ func newService(lc fx.Lifecycle, cfg *Config) *chi.Mux {
 				return err
 			}
 			log.Info().Msgf("Starting HTTP server at %s", srv.Addr)
-			go srv.Serve(ln)
+			go func() {
+				// Serve ritorna ErrServerClosed a ogni arresto ordinato (OnStop → Shutdown):
+				// quello è l'esito atteso. Qualsiasi altro errore significa che l'accept loop
+				// è morto e l'API non risponde più, mentre il processo resta su: senza questa
+				// riga non ci sarebbe nulla a dirlo. Il recovery lo fa l'orchestratore, che vede
+				// fallire la probe su /health — servita da questo stesso server.
+				if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					log.Error().Err(err).Msgf("HTTP server terminato su %s: l'API non risponde più", srv.Addr)
+				}
+			}()
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
