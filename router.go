@@ -58,7 +58,9 @@ func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 		config = huma.DefaultConfig(cfg.OpenApi.ApiName, cfg.OpenApi.ApiVersion)
 		config.SchemasPath = ""
 		config.CreateHooks = nil
-		config.OpenAPI.Components.Schemas = ApiRegistry
+		// `config.Components` È `config.OpenAPI.Components` (huma.Config incorpora OpenAPI): la
+		// riga che valorizzava `config.OpenAPI.Components.Schemas` era sovrascritta dalla
+		// sostituzione qui sotto, che rimpiazza l'intera struct Components.
 		config.Components = &huma.Components{
 			Schemas: ApiRegistry,
 		}
