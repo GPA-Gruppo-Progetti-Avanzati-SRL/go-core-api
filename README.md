@@ -226,25 +226,32 @@ func list(ctx context.Context, in *listInput, b bizperson.IBusiness) (*listOutpu
 
 ## Autorizzazione
 
-**Non è di questo modulo**: engine, sorgenti di ACL e middleware stanno in `go-core-auth`. Qui resta
-il montaggio, perché la `huma.API` la possiede questo modulo.
+**Non è di questo modulo, e questo modulo non la conosce**: engine, sorgenti di ACL e middleware
+stanno in `go-core-auth`, che dipende da qui e non viceversa — un middleware è un plugin del
+framework HTTP, e il framework non conosce i suoi plugin. `go-core-api` dipende dal solo
+`go-core-app`.
+
+Il middleware si monta da sé attraverso `WithRoutes`, senza che serva un'Option dedicata: per quel
+seam è un business come un altro.
 
 ```go
 coreauth.Module(&svc.Auth,
     coreauth.WithSource(mongosource.Module),
-    coreauth.WithMiddleware(apiauth.Module))   // ← il *Middleware che il Router monta
+    coreauth.WithMiddleware(apiauth.Module))   // fornisce il *Middleware a fx
 
-coreapi.Module(&svc.Api, coreapi.WithRoutes(routes.Register))
+coreapi.Module(&svc.Api,
+    coreapi.WithRoutes(apiauth.Register),      // func(*Router, *apiauth.Middleware)
+    coreapi.WithRoutes(routes.Register))
 ```
 
-Il `Matcher` del Router lo riceve come dipendenza **opzionale**: se non c'è nulla da montare non si
-monta nulla, e non è un errore — un'API può non avere autorizzazione. Che sia attiva lo decide la
-configurazione di go-core-auth (`services.auth.middleware.enabled`), non quella dell'API: prima la
-stessa decisione stava in due posti.
+Che l'autorizzazione sia attiva lo decide la configurazione di go-core-auth
+(`services.auth.middleware.enabled`), non quella dell'API: prima la stessa decisione stava in due
+posti. Se non è attiva, `apiauth.Register` non monta nulla e lo dice con un log.
 
-Il middleware registra da sé l'operazione `Token` (`GET /api/token`), arricchita con le response
-d'errore standard di questo modulo. Dentro un handler, identità e ruoli si leggono con gli accessor
-di `apiauth` (`UserFrom`, `RolesFrom`, `ContextIDFrom`, `AuthorizerFrom`).
+`apiauth.Register` registra anche l'operazione `Token` (`GET /api/token`) via
+`RegisterWithBusiness`, quindi con le response d'errore standard di questo modulo. Dentro un
+handler, identità e ruoli si leggono con gli accessor di `apiauth` (`UserFrom`, `RolesFrom`,
+`ContextIDFrom`, `AuthorizerFrom`).
 
 ### Capabilities
 
