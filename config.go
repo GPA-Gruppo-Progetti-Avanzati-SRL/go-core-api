@@ -2,8 +2,6 @@ package coreapi
 
 import (
 	"time"
-
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
 )
 
 type Config struct {
@@ -19,10 +17,9 @@ type Config struct {
 
 	// DevelopMode abilita gli endpoint diagnostici/discovery (/openapi, /capabilities).
 	// Default false: in produzione questi path non sono esposti.
-	DevelopMode   bool                  `yaml:"develop-mode"  mapstructure:"develop-mode"  json:"develop-mode"`
-	Proxy         []*ProxyConfig        `yaml:"proxy"         mapstructure:"proxy"         json:"proxy"`
-	Authorization *authorization.Config `yaml:"authorization" mapstructure:"authorization" json:"authorization"`
-	OpenApi       *OpenApiConfig        `yaml:"openapi"       mapstructure:"openapi"       json:"openapi"`
+	DevelopMode bool           `yaml:"develop-mode"  mapstructure:"develop-mode"  json:"develop-mode"`
+	Proxy       []*ProxyConfig `yaml:"proxy"   mapstructure:"proxy"   json:"proxy"`
+	OpenApi     *OpenApiConfig `yaml:"openapi" mapstructure:"openapi" json:"openapi"`
 }
 
 type OpenApiConfig struct {

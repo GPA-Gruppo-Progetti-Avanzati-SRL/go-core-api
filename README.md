@@ -226,28 +226,25 @@ func list(ctx context.Context, in *listInput, b bizperson.IBusiness) (*listOutpu
 
 ## Autorizzazione
 
-RBAC-based. Il middleware legge i ruoli dall'header configurato e li confronta con
-l'`authorization.Authorizer` di go-core-app, che va fornito al grafo (tipicamente da
-`coremongo.WithAuthorization()`, che alimenta la LUT dalla collection ACL). L'Authorizer è iniettato
-nel context della richiesta, così middleware e handler a valle lo recuperano senza dipendere dal Router.
+**Non è di questo modulo**: engine, sorgenti di ACL e middleware stanno in `go-core-auth`. Qui resta
+il montaggio, perché la `huma.API` la possiede questo modulo.
 
-```yaml
-config:
-  services:
-    api:
-      authorization:
-        enabled: true
-        roles-header:   X-Roles
-        context-header: X-Context
-        user-header:    X-User
-        delimiter: ","
-        guest-paths:
-          - /health
-          - /api/v1/public/*
+```go
+coreauth.Module(&svc.Auth,
+    coreauth.WithSource(mongosource.Module),
+    coreauth.WithMiddleware(apiauth.Module))   // ← il *Middleware che il Router monta
+
+coreapi.Module(&svc.Api, coreapi.WithRoutes(routes.Register))
 ```
 
-Con `enabled: true` e nessun Authorizer nel grafo l'app **non parte** (`log.Fatal` al wiring).
-Il modulo registra anche l'operazione `Token` di scambio.
+Il `Matcher` del Router lo riceve come dipendenza **opzionale**: se non c'è nulla da montare non si
+monta nulla, e non è un errore — un'API può non avere autorizzazione. Che sia attiva lo decide la
+configurazione di go-core-auth (`services.auth.middleware.enabled`), non quella dell'API: prima la
+stessa decisione stava in due posti.
+
+Il middleware registra da sé l'operazione `Token` (`GET /api/token`), arricchita con le response
+d'errore standard di questo modulo. Dentro un handler, identità e ruoli si leggono con gli accessor
+di `apiauth` (`UserFrom`, `RolesFrom`, `ContextIDFrom`, `AuthorizerFrom`).
 
 ### Capabilities
 

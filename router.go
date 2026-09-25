@@ -5,15 +5,13 @@ import (
 	"maps"
 	"reflect"
 
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/authorization"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
-	coreauth "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/authorization"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-auth/apiauth"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	prom "github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog/log"
 	"github.com/slok/go-http-metrics/metrics/prometheus"
 	"github.com/slok/go-http-metrics/middleware"
 )
@@ -43,9 +41,13 @@ type Router struct {
 	Api huma.API
 	Mux *chi.Mux
 }
+
+// Matcher porta il middleware di autorizzazione, che è di go-core-auth: questo modulo lo monta
+// soltanto. È opzionale perché un'API può non avere autorizzazione — in quel caso non si monta
+// nulla, e non è un errore.
 type Matcher struct {
 	core.In
-	Authorizer coreauth.Authorizer `optional:"true"`
+	Authorization *apiauth.Middleware `optional:"true"`
 }
 
 func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
@@ -103,6 +105,10 @@ func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 		cm.Get("/capabilities.yaml", capabilitiesYAMLHandler(r.Api))
 		cm.Get("/acl.mongo.js", capabilitiesMongoHandler(r.Api))
 		cm.Get("/acl.sql", capabilitiesSQLHandler(r.Api))
+		// Seed per go-core-auth: schema diverso e destinatario diverso da quelli sopra, che
+		// restano al vocabolario del frontdoor OPEM.
+		cm.Get("/acl.coreauth.sql", capabilitiesCoreAuthSQLHandler(r.Api))
+		cm.Get("/acl.coreauth.js", capabilitiesCoreAuthMongoHandler(r.Api))
 		// pprof sta qui e non su httpserver.go perché in mode API la porta è quella PUBBLICA,
 		// condivisa con le rotte dell'applicazione: develop-mode è l'unico gate, quindi in
 		// produzione (develop-mode: false) /debug/pprof/* non è proprio registrato.
@@ -112,32 +118,13 @@ func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(tracingHandler)
-	if cfg.Authorization != nil && cfg.Authorization.Enabled {
-		// Inject authorizer in context for downstream middlewares/handlers
-		if matcher.Authorizer != nil {
-			r.Api.UseMiddleware(authorizerInjector(matcher.Authorizer))
-			r.Api.UseMiddleware(authorization.AuthorizationHandler(cfg.Authorization))
-			// Register standalone handlers (decoupled from Router)
-			huma.Register(r.Api, withDefaultResponses(authorization.TokenOperation), authorization.Token)
-		} else {
-			log.Fatal().Msg("No authorization operator  specified so i can't register the authorization middleware")
-		}
-
-	}
+	// L'autorizzazione si monta se c'è: che sia attiva lo decide la sua configurazione
+	// (services.auth.middleware.enabled), non questa. Il montaggio resta qui perché la huma.API la
+	// possiede questo modulo.
+	matcher.Authorization.Register(r.Api, withDefaultResponses)
 	r.Api.UseMiddleware(r.ValidatorHandler)
 	configureError()
 	return r
-}
-
-// authorizerInjector injects the provided Authorizer into the request context so that
-// downstream middlewares and handlers can retrieve it without binding to Router.
-func authorizerInjector(auth coreauth.Authorizer) func(huma.Context, func(huma.Context)) {
-	return func(ctx huma.Context, next func(huma.Context)) {
-		if auth != nil {
-			ctx = huma.WithValue(ctx, "authorizer", auth)
-		}
-		next(ctx)
-	}
 }
 
 var ApiRegistry = huma.NewMapRegistry("#/components/schemas/", huma.DefaultSchemaNamer)
