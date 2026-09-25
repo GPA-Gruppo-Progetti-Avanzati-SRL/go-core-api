@@ -19,7 +19,7 @@ func TestOpenApiDisabled(t *testing.T) {
 		OpenApi: nil,
 	}
 
-	_ = newRouter(mux, cfg, Matcher{})
+	_ = newRouter(mux, cfg)
 
 	req, _ := http.NewRequest("GET", "/openapi", nil)
 	rr := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func TestOpenApiEnabled(t *testing.T) {
 		},
 	}
 
-	router := newRouter(mux, cfg, Matcher{})
+	router := newRouter(mux, cfg)
 
 	req, _ := http.NewRequest("GET", "/openapi", nil)
 	rr := httptest.NewRecorder()
@@ -113,7 +113,7 @@ func TestRegisterWithBusinessIsolatesResponses(t *testing.T) {
 		DevelopMode: true,
 		OpenApi:     &OpenApiConfig{ApiName: "Test API", ApiVersion: "1.0.0"},
 	}
-	router := newRouter(mux, cfg, Matcher{})
+	router := newRouter(mux, cfg)
 
 	RegisterWithBusiness(router, struct{}{},
 		huma.Operation{OperationID: "GetA", Method: http.MethodGet, Path: "/a", DefaultStatus: http.StatusOK},
@@ -158,7 +158,7 @@ func TestAliasOnlyRegistration(t *testing.T) {
 	router := newRouter(mux, &Config{
 		DevelopMode: true,
 		OpenApi:     &OpenApiConfig{ApiName: "Alias API", ApiVersion: "1.0.0"},
-	}, Matcher{})
+	})
 
 	type body struct {
 		Name string `json:"name"`
@@ -240,7 +240,7 @@ func TestPprofSoloInDevelopMode(t *testing.T) {
 
 	t.Run("develop-mode false: non esposto", func(t *testing.T) {
 		mux := chi.NewRouter()
-		_ = newRouter(mux, &Config{}, Matcher{})
+		_ = newRouter(mux, &Config{})
 
 		for _, p := range paths {
 			req, _ := http.NewRequest("GET", p, nil)
@@ -252,7 +252,7 @@ func TestPprofSoloInDevelopMode(t *testing.T) {
 
 	t.Run("develop-mode true: esposto", func(t *testing.T) {
 		mux := chi.NewRouter()
-		_ = newRouter(mux, &Config{DevelopMode: true}, Matcher{})
+		_ = newRouter(mux, &Config{DevelopMode: true})
 
 		for _, p := range paths {
 			req, _ := http.NewRequest("GET", p, nil)

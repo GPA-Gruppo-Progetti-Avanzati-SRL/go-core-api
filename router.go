@@ -7,7 +7,6 @@ import (
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-auth/apiauth"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
@@ -42,15 +41,7 @@ type Router struct {
 	Mux *chi.Mux
 }
 
-// Matcher porta il middleware di autorizzazione, che è di go-core-auth: questo modulo lo monta
-// soltanto. È opzionale perché un'API può non avere autorizzazione — in quel caso non si monta
-// nulla, e non è un errore.
-type Matcher struct {
-	core.In
-	Authorization *apiauth.Middleware `optional:"true"`
-}
-
-func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
+func newRouter(cm *chi.Mux, cfg *Config) *Router {
 	r := &Router{
 		Mux: cm,
 	}
@@ -118,10 +109,6 @@ func newRouter(cm *chi.Mux, cfg *Config, matcher Matcher) *Router {
 
 	r.Api.UseMiddleware(reporter.MetricsHandler)
 	r.Api.UseMiddleware(tracingHandler)
-	// L'autorizzazione si monta se c'è: che sia attiva lo decide la sua configurazione
-	// (services.auth.middleware.enabled), non questa. Il montaggio resta qui perché la huma.API la
-	// possiede questo modulo.
-	matcher.Authorization.Register(r.Api, withDefaultResponses)
 	r.Api.UseMiddleware(r.ValidatorHandler)
 	configureError()
 	return r

@@ -61,7 +61,7 @@ var invoke = core.Invoke
 // *Config, *Router, *chi.Mux e il server HTTP sono privati al modulo e non iniettabili dal grafo
 // dell'app (il *Router arriva alle Register come parametro, che è il solo modo in cui serve). Il
 // business dell'app è fornito a root e resta risolvibile dagli invoke del modulo, che ne è
-// discendente. L'Authorizer resta opzionale (Matcher, fornito dall'app se l'autorizzazione è abilitata).
+// discendente.
 //
 // Senza alcun WithRoutes non c'è nessun invoke: il Router (e con lui il server) si costruisce solo
 // se qualcuno lo consuma — comportamento storico, invariato.
