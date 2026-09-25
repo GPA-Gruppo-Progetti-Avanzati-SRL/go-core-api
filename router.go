@@ -39,11 +39,16 @@ func (r idempotentRegisterer) MustRegister(cs ...prom.Collector) {
 type Router struct {
 	Api huma.API
 	Mux *chi.Mux
+	// DevelopMode riporta il develop-mode della configurazione. Serve a chi registra rotte di
+	// diagnostica attraverso WithRoutes: senza, dovrebbe dedurlo da una seconda configurazione, e
+	// due sorgenti per la stessa decisione divergono.
+	DevelopMode bool
 }
 
 func newRouter(cm *chi.Mux, cfg *Config) *Router {
 	r := &Router{
-		Mux: cm,
+		Mux:         cm,
+		DevelopMode: cfg.DevelopMode,
 	}
 	var config huma.Config
 
@@ -96,10 +101,6 @@ func newRouter(cm *chi.Mux, cfg *Config) *Router {
 		cm.Get("/capabilities.yaml", capabilitiesYAMLHandler(r.Api))
 		cm.Get("/acl.mongo.js", capabilitiesMongoHandler(r.Api))
 		cm.Get("/acl.sql", capabilitiesSQLHandler(r.Api))
-		// Seed per go-core-auth: schema diverso e destinatario diverso da quelli sopra, che
-		// restano al vocabolario del frontdoor OPEM.
-		cm.Get("/acl.coreauth.sql", capabilitiesCoreAuthSQLHandler(r.Api))
-		cm.Get("/acl.coreauth.js", capabilitiesCoreAuthMongoHandler(r.Api))
 		// pprof sta qui e non su httpserver.go perché in mode API la porta è quella PUBBLICA,
 		// condivisa con le rotte dell'applicazione: develop-mode è l'unico gate, quindi in
 		// produzione (develop-mode: false) /debug/pprof/* non è proprio registrato.

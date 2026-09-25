@@ -12,12 +12,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// capabilityEntry è il formato JSON esposto dall'endpoint GET /capabilities.
+// CapabilityEntry è il formato JSON esposto dall'endpoint GET /capabilities.
+//
+// È esportata insieme a Capabilities e CapabilityID perché la generazione dei seed ACL non è
+// tutta di questo modulo: qui sta ciò che solo qui si può sapere — quali capability l'applicazione
+// espone, dedotte dal registry huma — mentre la serializzazione verso uno schema appartiene a chi
+// quello schema lo legge.
 // Corrisponde al formato atteso dal discovery loader di app-fe.
 // id:          ID UPPER_SNAKE locale (prefissato dal gateway con il proxy id)
 // operationId: operationId originale Huma per Match() nel backend; omesso se uguale a id
 // category:    "api" | "action_api"
-type capabilityEntry struct {
+type CapabilityEntry struct {
 	ID          string `json:"id"`
 	Category    string `json:"category"`
 	Description string `json:"description,omitempty"`
@@ -40,12 +45,12 @@ type capDefDoc struct {
 }
 
 // actionCapabilities raccoglie le capability action_api registrate dall'applicazione.
-var actionCapabilities []capabilityEntry
+var actionCapabilities []CapabilityEntry
 
 // RegisterActionCapability registra una capability action_api inclusa nella risposta
 // di GET /capabilities. Chiamare durante l'inizializzazione dell'applicazione.
 func RegisterActionCapability(id, description string) {
-	actionCapabilities = append(actionCapabilities, capabilityEntry{
+	actionCapabilities = append(actionCapabilities, CapabilityEntry{
 		ID:          id,
 		Category:    "action_api",
 		Description: description,
@@ -55,7 +60,7 @@ func RegisterActionCapability(id, description string) {
 // capabilitiesHandler serve GET /capabilities → JSON.
 func capabilitiesHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := buildEntries(api)
+		entries := Capabilities(api)
 		data, err := json.Marshal(entries)
 		if err != nil {
 			log.Error().Err(err).Msg("capabilities: marshal error")
@@ -71,7 +76,7 @@ func capabilitiesHandler(api huma.API) http.HandlerFunc {
 // capabilitiesYAMLHandler serve GET /capabilities.yaml → YAML cap_defs + cap_groups.
 func capabilitiesYAMLHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := buildEntries(api)
+		entries := Capabilities(api)
 		w.Header().Set("Content-Type", "text/yaml")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(toCapabilitiesYAML(entries)))
@@ -81,28 +86,30 @@ func capabilitiesYAMLHandler(api huma.API) http.HandlerFunc {
 // capabilitiesMongoHandler serve GET /acl.mongo.js → script replaceOne upsert per MongoDB.
 func capabilitiesMongoHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := buildEntries(api)
+		entries := Capabilities(api)
 		w.Header().Set("Content-Type", "application/javascript")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(toCapabilitiesMongo(entries)))
 	}
 }
 
-// capID costruisce l'_id strutturato per un capability entry: api:<appID>:<id>.
-func capID(appID, id string) string {
+// CapabilityID costruisce l'id strutturato di una capability: cap:<appID>:api:<id>. È la
+// convenzione con cui le capability si nominano in tutti gli ACL della catena, quindi chi genera
+// un seed deve usarla e non reinventarla.
+func CapabilityID(appID, id string) string {
 	return fmt.Sprintf("cap:%s:api:%s", appID, strings.ToLower(id))
 }
 
 // toCapabilitiesYAML serializza le capability nel formato cap_defs + cap_groups
 // allineato a ng-core-ui toRoutesYaml.
-func toCapabilitiesYAML(entries []capabilityEntry) string {
+func toCapabilitiesYAML(entries []CapabilityEntry) string {
 	appID := core.AppName
 	var sb strings.Builder
 
 	sb.WriteString("cap_defs:\n")
 	for _, e := range entries {
 		fmt.Fprintf(&sb, "  - category: %s\n", e.Category)
-		fmt.Fprintf(&sb, "    _id: %q\n", capID(appID, e.ID))
+		fmt.Fprintf(&sb, "    _id: %q\n", CapabilityID(appID, e.ID))
 		fmt.Fprintf(&sb, "    app: %q\n", appID)
 		if e.Description != "" {
 			fmt.Fprintf(&sb, "    description: %q\n", e.Description)
@@ -121,7 +128,7 @@ func toCapabilitiesYAML(entries []capabilityEntry) string {
 	groupID := fmt.Sprintf("grp:%s:ALL", appID)
 	fmt.Fprintf(&sb, "cap_groups:\n  - _id: %q\n    description: \"\"\n    capabilities:\n", groupID)
 	for _, e := range entries {
-		fmt.Fprintf(&sb, "      - %q\n", capID(appID, e.ID))
+		fmt.Fprintf(&sb, "      - %q\n", CapabilityID(appID, e.ID))
 	}
 
 	return sb.String()
@@ -129,7 +136,7 @@ func toCapabilitiesYAML(entries []capabilityEntry) string {
 
 // toCapabilitiesMongo serializza le capability come script replaceOne upsert
 // allineato a ng-core-ui toRoutesMongo.
-func toCapabilitiesMongo(entries []capabilityEntry) string {
+func toCapabilitiesMongo(entries []CapabilityEntry) string {
 	appID := core.AppName
 	var sb strings.Builder
 
@@ -137,7 +144,7 @@ func toCapabilitiesMongo(entries []capabilityEntry) string {
 
 	for _, e := range entries {
 		doc := capDefDoc{
-			ID:          capID(appID, e.ID),
+			ID:          CapabilityID(appID, e.ID),
 			ET:          "cap-def",
 			App:         appID,
 			Category:    e.Category,
@@ -155,7 +162,7 @@ func toCapabilitiesMongo(entries []capabilityEntry) string {
 		)
 		fmt.Fprintf(&sb,
 			"db.getCollection(COLLECTION).replaceOne(\n    { _id: %s },\n    %s,\n    { upsert: true }\n)\n\n",
-			jsonStr(capID(appID, e.ID)), body,
+			jsonStr(CapabilityID(appID, e.ID)), body,
 		)
 	}
 
@@ -163,7 +170,7 @@ func toCapabilitiesMongo(entries []capabilityEntry) string {
 	groupID := fmt.Sprintf("grp:%s:ALL", appID)
 	var caps []string
 	for _, e := range entries {
-		caps = append(caps, fmt.Sprintf("        %s", jsonStr(capID(appID, e.ID))))
+		caps = append(caps, fmt.Sprintf("        %s", jsonStr(CapabilityID(appID, e.ID))))
 	}
 	groupDoc := fmt.Sprintf(
 		"{\n    _id: %s,\n    _et: \"cap-group\",\n    description: \"\",\n    capabilities: [\n%s\n    ],\n    sys_info: {\n        status: \"active\",\n        created_at: new Date(),\n        modified_at: new Date()\n    }\n}",
@@ -190,7 +197,7 @@ func sqlStr(s string) string {
 // capabilitiesSQLHandler serve GET /acl.sql → script INSERT upsert per SQL (PostgreSQL).
 func capabilitiesSQLHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := buildEntries(api)
+		entries := Capabilities(api)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(toCapabilitiesSQL(entries)))
@@ -200,7 +207,7 @@ func capabilitiesSQLHandler(api huma.API) http.HandlerFunc {
 // toCapabilitiesSQL serializza le capability come script INSERT ... ON CONFLICT upsert
 // per le tabelle opem_acl_cap_def, opem_acl_cap_group e opem_acl_cap_group_def.
 // Sintassi: PostgreSQL / SQLite (ON CONFLICT ... DO UPDATE / DO NOTHING).
-func toCapabilitiesSQL(entries []capabilityEntry) string {
+func toCapabilitiesSQL(entries []CapabilityEntry) string {
 	appID := core.AppName
 	var sb strings.Builder
 
@@ -211,7 +218,7 @@ func toCapabilitiesSQL(entries []capabilityEntry) string {
 	// ── cap_def ──────────────────────────────────────────────────────────────
 	sb.WriteString("-- cap_defs\n")
 	for _, e := range entries {
-		id := capID(appID, e.ID)
+		id := CapabilityID(appID, e.ID)
 		name := e.Description
 		if name == "" {
 			name = e.ID
@@ -244,15 +251,16 @@ func toCapabilitiesSQL(entries []capabilityEntry) string {
 		fmt.Fprintf(&sb,
 			"INSERT INTO opem_acl_cap_group_def (cap_group_id, cap_def_id) VALUES (%s, %s)\n"+
 				"ON CONFLICT (cap_group_id, cap_def_id) DO NOTHING;\n",
-			sqlStr(groupID), sqlStr(capID(appID, e.ID)),
+			sqlStr(groupID), sqlStr(CapabilityID(appID, e.ID)),
 		)
 	}
 
 	return sb.String()
 }
 
-// buildEntries costruisce le capabilityEntry dalle operazioni Huma + action_api registrate.
-func buildEntries(api huma.API) []capabilityEntry {
+// Capabilities elenca le capability che l'applicazione espone: una per operazione huma registrata,
+// più le action_api dichiarate con RegisterActionCapability.
+func Capabilities(api huma.API) []CapabilityEntry {
 	openapi := api.OpenAPI()
 
 	type methodOp struct {
@@ -260,7 +268,7 @@ func buildEntries(api huma.API) []capabilityEntry {
 		op     *huma.Operation
 	}
 
-	var entries []capabilityEntry
+	var entries []CapabilityEntry
 	for path, item := range openapi.Paths {
 		candidates := []methodOp{
 			{"GET", item.Get},
@@ -278,7 +286,7 @@ func buildEntries(api huma.API) []capabilityEntry {
 			if desc == "" {
 				desc = mo.op.Description
 			}
-			e := capabilityEntry{
+			e := CapabilityEntry{
 				ID:          capID,
 				Category:    "api",
 				Description: desc,
