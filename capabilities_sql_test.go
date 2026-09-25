@@ -1,59 +1,16 @@
 package coreapi
 
 import (
-	"regexp"
-	"slices"
 	"strings"
 	"testing"
-
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-auth/sqlsource"
 )
 
-// Il seed di /acl.coreauth.sql lo scrive questo modulo, le tabelle le legge go-core-auth/sqlsource:
-// sono due moduli rilasciati separatamente, e nulla li tiene allineati a compile-time. Questi test
-// sono il presidio — una colonna rinominata da un lato diventa un test rosso invece di una query
-// che in produzione non trova la colonna.
+// Qui si verifica ciò che questo modulo può verificare da solo: che /acl.sql resti al vocabolario
+// del frontdoor OPEM e che il seed non assegni nulla ai ruoli.
 //
-// /acl.sql e /acl.mongo.js non sono coperti da qui: hanno un altro destinatario (il frontdoor
-// OPEM) e un altro schema, e il presidio di quel contratto non sta in questo repo.
-
-var insertRe = regexp.MustCompile(`(?s)INSERT INTO (\w+) \(([^)]*)\)`)
-
-func TestToCoreAuthSQL_ScriveSulloSchemaCheSqlsourceLegge(t *testing.T) {
-	script := toCoreAuthSQL([]capabilityEntry{
-		{ID: "GET_PERSONS", Category: "api", Description: "Elenco", Endpoint: "/api/persons", Method: "GET"},
-		{ID: "EXPORT", Category: "action_api", Description: "Export massivo"},
-	})
-
-	schema := sqlsource.Schema()
-	matches := insertRe.FindAllStringSubmatch(script, -1)
-	if len(matches) == 0 {
-		t.Fatalf("nessuna INSERT generata:\n%s", script)
-	}
-
-	seen := map[string]bool{}
-	for _, m := range matches {
-		table, cols := m[1], splitColumns(m[2])
-		seen[table] = true
-
-		known, ok := schema[table]
-		if !ok {
-			t.Errorf("INSERT su %q, che non è una tabella di sqlsource: %v", table, sqlsource.TableNames())
-			continue
-		}
-		for _, c := range cols {
-			if !slices.Contains(known, c) {
-				t.Errorf("tabella %s: colonna %q non esiste nel modello di sqlsource (%v)", table, c, known)
-			}
-		}
-	}
-
-	for _, want := range []string{"acl_capability", "acl_capability_group", "acl_capability_group_item"} {
-		if !seen[want] {
-			t.Errorf("il seed non scrive su %s", want)
-		}
-	}
-}
+// Il confronto fra le colonne generate da /acl.coreauth.sql e quelle lette da
+// go-core-auth/sqlsource NON sta qui: richiederebbe di importare go-core-auth, e questo modulo non
+// deve dipenderne. Sta in go-core-auth (seed_test.go), che è l'unico dei due a vedere entrambi.
 
 // Il seed descrive ciò che l'applicazione espone; assegnare le capability a un ruolo è una
 // decisione di chi governa l'ACL, e un generatore non deve prenderla al posto suo.
@@ -74,17 +31,6 @@ func TestToCoreAuthSQL_EscapeDegliApici(t *testing.T) {
 	if !strings.Contains(script, "'L''anagrafica'") {
 		t.Errorf("apice non raddoppiato nello script:\n%s", script)
 	}
-}
-
-func splitColumns(s string) []string {
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		if t := strings.TrimSpace(strings.ReplaceAll(p, "\n", "")); t != "" {
-			out = append(out, t)
-		}
-	}
-	return out
 }
 
 // Il documento mongo del seed deve avere la forma che mongosource smista: _et maiuscolo e

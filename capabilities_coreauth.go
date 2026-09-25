@@ -21,13 +21,23 @@ import (
 // raccoglie. Assegnare il gruppo a un ruolo resta un atto esplicito di chi governa l'ACL — ed è la
 // ragione per cui eseguire il seed non concede permessi a nessuno.
 
+// CapabilitiesCoreAuthSQL rende il seed delle capability per le tabelle acl_* di
+// go-core-auth/sqlsource. È esportata perché il presidio dell'allineamento fra i nomi delle
+// colonne scritti qui e quelli letti là sta in go-core-auth: è l'unico dei due moduli che può
+// vedere entrambi, visto che questo non dipende da quello.
+func CapabilitiesCoreAuthSQL(api huma.API) string { return toCoreAuthSQL(buildEntries(api)) }
+
+// CapabilitiesCoreAuthMongo rende il seed delle capability per la collection acl di
+// go-core-auth/mongosource.
+func CapabilitiesCoreAuthMongo(api huma.API) string { return toCoreAuthMongo(buildEntries(api)) }
+
 // capabilitiesCoreAuthSQLHandler serve GET /acl.coreauth.sql → upsert sulle tabelle acl_* lette da
 // go-core-auth/sqlsource.
 func capabilitiesCoreAuthSQLHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(toCoreAuthSQL(buildEntries(api))))
+		_, _ = w.Write([]byte(CapabilitiesCoreAuthSQL(api)))
 	}
 }
 
@@ -37,7 +47,7 @@ func capabilitiesCoreAuthMongoHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/javascript")
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(toCoreAuthMongo(buildEntries(api))))
+		_, _ = w.Write([]byte(CapabilitiesCoreAuthMongo(api)))
 	}
 }
 
