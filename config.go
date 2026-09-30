@@ -15,11 +15,50 @@ type Config struct {
 	// net/http (DefaultMaxHeaderValueCount = 500).
 	MaxHeaderValueCount int `yaml:"max-header-value-count" mapstructure:"max-header-value-count" json:"max-header-value-count"`
 
+	// Timeout del server HTTP pubblico. Un valore assente (0) vale il default della libreria, un
+	// valore negativo disattiva il timeout — scelta esplicita, perché senza timeout un client lento
+	// tiene aperta una connessione (e una goroutine) per sempre: è la Slowloris.
+	//
+	//	read-header-timeout  DefaultReadHeaderTimeout (10s): tempo per ricevere gli header
+	//	read-timeout         DefaultReadTimeout (1m): tempo per ricevere l'intera richiesta
+	//	write-timeout        DefaultWriteTimeout (2m): tempo per scrivere la risposta; da alzare per
+	//	                     le risposte lunghe (download, streaming)
+	ReadHeaderTimeout time.Duration `yaml:"read-header-timeout" mapstructure:"read-header-timeout" json:"read-header-timeout"`
+	ReadTimeout       time.Duration `yaml:"read-timeout" mapstructure:"read-timeout" json:"read-timeout"`
+	WriteTimeout      time.Duration `yaml:"write-timeout" mapstructure:"write-timeout" json:"write-timeout"`
+
+	// MaxBodyBytes limita il body di ogni richiesta, rotte, proxy e middleware compresi (un body più
+	// grande è un 413). 0 vale DefaultMaxBodyBytes (10 MiB), un valore negativo disattiva il limite.
+	// Le operazioni huma hanno anche il proprio limite (Operation.MaxBodyBytes, 1 MiB di default),
+	// che si applica dentro questo.
+	MaxBodyBytes int64 `yaml:"max-body-bytes" mapstructure:"max-body-bytes" json:"max-body-bytes"`
+
 	// DevelopMode abilita gli endpoint diagnostici/discovery (/openapi, /capabilities).
 	// Default false: in produzione questi path non sono esposti.
 	DevelopMode bool           `yaml:"develop-mode"  mapstructure:"develop-mode"  json:"develop-mode"`
 	Proxy       []*ProxyConfig `yaml:"proxy"   mapstructure:"proxy"   json:"proxy"`
 	OpenApi     *OpenApiConfig `yaml:"openapi" mapstructure:"openapi" json:"openapi"`
+}
+
+// Default del server HTTP pubblico (vedi Config).
+const (
+	DefaultIdleTimeout       = 30 * time.Second
+	DefaultReadHeaderTimeout = 10 * time.Second
+	DefaultReadTimeout       = time.Minute
+	DefaultWriteTimeout      = 2 * time.Minute
+	DefaultMaxBodyBytes      = 10 << 20
+)
+
+// orDefault: 0 vale il default, un negativo disattiva (0 per net/http), il resto è il valore.
+func orDefault[T time.Duration | int64](v, def T) T {
+	switch {
+	case v == 0:
+		return def
+	case v < 0:
+		return 0
+	default:
+		return v
+	}
 }
 
 type OpenApiConfig struct {

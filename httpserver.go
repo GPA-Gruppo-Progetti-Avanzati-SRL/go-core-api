@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/httpx"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/observability"
@@ -17,16 +16,20 @@ func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) *chi.Mux {
 	mux := chi.NewRouter()
 	server := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
+	// In testa, prima di qualsiasi rotta (chi non accetta un Use dopo): valgono per tutto ciò che
+	// il server serve, proxy compresi. Il recover è il più esterno, così copre anche il limite.
+	mux.Use(recoverer, limitBody(orDefault(cfg.MaxBodyBytes, DefaultMaxBodyBytes)))
+
 	for _, pc := range cfg.Proxy {
 		mux.Mount(pc.MountPath, NewReverseProxy(pc))
 	}
-	if cfg.Idle == 0 {
-		cfg.Idle = 30 * time.Second
-	}
 	srv := &http.Server{
-		Addr:        server,
-		Handler:     mux,
-		IdleTimeout: cfg.Idle,
+		Addr:              server,
+		Handler:           mux,
+		IdleTimeout:       orDefault(cfg.Idle, DefaultIdleTimeout),
+		ReadHeaderTimeout: orDefault(cfg.ReadHeaderTimeout, DefaultReadHeaderTimeout),
+		ReadTimeout:       orDefault(cfg.ReadTimeout, DefaultReadTimeout),
+		WriteTimeout:      orDefault(cfg.WriteTimeout, DefaultWriteTimeout),
 		// A 0 net/http applica DefaultMaxHeaderValueCount: nessun default da
 		// duplicare qui.
 		MaxHeaderValueCount: cfg.MaxHeaderValueCount,

@@ -15,7 +15,10 @@ const Ambit = "go-core-api"
 
 // Codici emessi dal modulo. Tutti finiscono nel campo `code` del DefaultError.
 const (
-	CodeSort = "ERR-SORT" // query param `sort` non parsabile
+	CodeSort         = "ERR-SORT"           // query param `sort` non parsabile
+	CodePanic        = "API-PANIC"          // 500: un handler è andato in panic (recoverer)
+	CodeBodyTooLarge = "API-BODY-TOO-LARGE" // 413: body oltre `max-body-bytes`
+	CodeBodyRead     = "API-BODY-READ"      // 400: body della richiesta non leggibile
 )
 
 func ManageBusinessError(e *core.Error) error {

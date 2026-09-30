@@ -26,20 +26,33 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 	registry := r.Api.OpenAPI().Components.Schemas
 
 	content, ok := ctx.Operation().RequestBody.Content["application/json"]
-	if !ok {
+	if !ok || content.Schema == nil || content.Schema.Ref == "" {
+		// Nessuno schema con nome (un array o un tipo inline al top-level del body): non c'è un tipo
+		// Go da cui rileggere i tag `validate:`, e TypeFromRef su un Ref vuoto panicava
+		// (`ref[len(prefix):]`). La validazione dello schema la fa comunque huma.
 		next(vc)
 		return
 	}
-	schemaRef := content.Schema.Ref
-	t := registry.TypeFromRef(schemaRef)
+	t := registry.TypeFromRef(content.Schema.Ref)
+	if t == nil || t.Kind() != reflect.Struct {
+		// I tag `validate:` sono per struct: un altro tipo lo valida huma dallo schema.
+		next(vc)
+		return
+	}
 	log.Trace().Msgf("ValidatorHandler type: %+v", t)
 	input := reflect.New(t).Interface()
-	b, err := io.ReadAll(vc.BodyReader())
+	b, err := vc.readBody()
 	if err != nil {
-		next(vc)
+		// Un body non letto per intero — oltre `max-body-bytes`, o connessione interrotta — non va
+		// passato all'handler: la validazione sarebbe stata saltata e l'handler avrebbe lavorato su
+		// un body troncato. Prima si proseguiva con next(vc).
+		status, code, msg := bodyReadError(err)
+		writeHumaError(vc, status, code, msg)
 		return
 	}
 	if berr := json.Unmarshal(b, input); berr != nil {
+		// JSON non decodificabile nel tipo: lo rifiuta huma, che valida il body contro lo schema e
+		// risponde con il suo errore di formato. Qui non c'è niente da aggiungere.
 		next(vc)
 		return
 	}
@@ -70,8 +83,10 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 }
 
 type ValidatorContext struct {
-	c  huma.Context
-	br *bytes.Reader
+	c       huma.Context
+	br      *bytes.Reader
+	buf     []byte
+	readErr error
 }
 
 func (r *ValidatorContext) TLS() *tls.ConnectionState {
@@ -115,31 +130,34 @@ func (r *ValidatorContext) EachHeader(cb func(name string, value string)) {
 	r.c.EachHeader(cb)
 }
 
-func (r *ValidatorContext) BodyReader() io.Reader {
-
+// readBody legge il body una volta sola, lo tiene in memoria per i lettori successivi e ritorna
+// l'errore di lettura: un body troncato (oltre `max-body-bytes`, o una connessione interrotta) deve
+// fermare la richiesta, non arrivare all'handler come se fosse completo.
+func (r *ValidatorContext) readBody() ([]byte, error) {
 	if r.br != nil {
-		// Riavvolge il body già letto perché il prossimo lettore (l'handler, dopo il
-		// middleware) lo trovi da capo. Su un bytes.Reader l'errore non è raggiungibile, ma se
-		// lo fosse il lettore successivo leggerebbe un body troncato senza accorgersene.
-		if _, err := r.br.Seek(0, io.SeekStart); err != nil {
-			log.Error().Err(err).Msg("riavvolgimento del body fallito: il prossimo lettore vedrà un body parziale")
-		}
-		return r.br
+		return r.buf, r.readErr
 	}
 	b, err := io.ReadAll(r.c.BodyReader())
-	if err != nil {
-		// Il body letto resta quello parziale: la validazione lo vedrà così, ed è l'unico
-		// punto in cui si può sapere che era troncato e non semplicemente malformato.
-		log.Warn().Err(err).Msg("lettura del body incompleta")
-	}
 	// La deadline di lettura viene tolta perché il body è già in memoria: da qui in poi
 	// nessun handler deve più aspettare la rete.
-	if err := r.c.SetReadDeadline(time.Time{}); err != nil {
-		log.Warn().Err(err).Msg("rimozione della read deadline fallita")
+	if derr := r.c.SetReadDeadline(time.Time{}); derr != nil {
+		log.Warn().Err(derr).Msg("rimozione della read deadline fallita")
 	}
-	r.br = bytes.NewReader(b)
-	return r.br
+	r.buf, r.readErr, r.br = b, err, bytes.NewReader(b)
+	return b, err
+}
 
+func (r *ValidatorContext) BodyReader() io.Reader {
+	if _, err := r.readBody(); err != nil {
+		log.Warn().Err(err).Msg("lettura del body incompleta")
+	}
+	// Riavvolto perché ogni lettore (l'handler, dopo il middleware) lo trovi da capo. Su un
+	// bytes.Reader l'errore non è raggiungibile, ma se lo fosse il lettore successivo leggerebbe
+	// un body troncato senza accorgersene.
+	if _, err := r.br.Seek(0, io.SeekStart); err != nil {
+		log.Error().Err(err).Msg("riavvolgimento del body fallito: il prossimo lettore vedrà un body parziale")
+	}
+	return r.br
 }
 
 func (r *ValidatorContext) GetMultipartForm() (*multipart.Form, error) {
@@ -176,4 +194,18 @@ func (r *ValidatorContext) BodyWriter() io.Writer {
 }
 func (r *ValidatorContext) Context() context.Context {
 	return r.c.Context()
+}
+
+// writeHumaError scrive un DefaultError sul context huma, per chi non passa da un handler.
+func writeHumaError(ctx huma.Context, status int, code, msg string) {
+	ctx.SetHeader("Content-Type", "application/json")
+	ctx.SetStatus(status)
+	b, err := json.Marshal(&DefaultError{Ambit: Ambit, Code: code, Message: msg})
+	if err != nil {
+		log.Error().Err(err).Str("code", code).Msg("serializzazione della risposta d'errore fallita")
+		return
+	}
+	if _, err := ctx.BodyWriter().Write(b); err != nil {
+		log.Warn().Err(err).Str("code", code).Msg("invio della risposta d'errore non completato")
+	}
 }

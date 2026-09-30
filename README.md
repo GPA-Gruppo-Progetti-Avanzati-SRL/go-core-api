@@ -280,6 +280,10 @@ config:
       host: ""
       port: 8080
       idle: 30s                      # default 30s
+      read-header-timeout: 10s       # default 10s  (negativo = disattivato)
+      read-timeout: 1m               # default 1m
+      write-timeout: 2m              # default 2m   (da alzare per download/streaming lunghi)
+      max-body-bytes: 10485760       # default 10 MiB (negativo = nessun limite)
       develop-mode: false            # true = /openapi + endpoint di discovery
       max-header-value-count: 0      # 0 = default net/http (500)
       openapi:
@@ -311,6 +315,23 @@ regalerebbe a chiunque raggiunga il servizio `/debug/pprof/profile?seconds=N` (C
 
 `max-header-value-count` è il `Server.MaxHeaderValueCount` di net/http (Go 1.27+): protezione contro
 le richieste con migliaia di header.
+
+**Il server pubblico ha timeout e un limite al body di default.** Senza, un client lento teneva
+aperta una connessione — e una goroutine — per sempre (Slowloris), e ogni body veniva letto per
+intero in memoria. I tre timeout valgono il default se assenti e si disattivano solo con un valore
+**negativo**, scelto apposta; `max-body-bytes` si applica a ogni richiesta, proxy compresi, e un body
+più grande riceve un **413** (`API-BODY-TOO-LARGE`). Le operazioni huma hanno anche il proprio limite
+(`Operation.MaxBodyBytes`, 1 MiB di default), che resta valido dentro questo.
+
+**Un panic in un handler diventa un 500** in forma `DefaultError` (`API-PANIC`), loggato con lo stack
+e la richiesta che l'ha causato: prima net/http chiudeva la connessione, e il client vedeva una
+risposta vuota senza che nulla finisse nelle metriche. `http.ErrAbortHandler`, con cui un handler o il
+reverse proxy interrompono apposta una risposta, viene rilanciato.
+
+**Il `ValidatorHandler`** (i tag `validate:` del body) salta i body il cui schema non ha un tipo con
+nome — un array o un tipo inline al top-level, che prima lo facevano panicare — e lascia a huma la
+validazione dello schema; un body che non si riesce a leggere per intero ferma la richiesta (413 o
+`API-BODY-READ` 400) invece di arrivare all'handler troncato.
 
 ---
 

@@ -34,7 +34,10 @@ e il **suo** status. Il campo `cause` è non esportato: nel JSON non compare mai
 
 | Codice | HTTP | Costante | Origine | Significato |
 |---|---|---|---|---|
-| `ERR-SORT` | 422 | `coreapi.CodeSort` | `page.go:29` (`PagingRequest.GetSort`) | query param `sort` non parsabile; l'errore di `page.ParseSort` è la causa |
+| `ERR-SORT` | 422 | `coreapi.CodeSort` | `page.go:29` (`PagingRequest.GetSort`) | query param `sort` non parsabile, o con un campo che non è un identificatore (`page.ValidSortField`); l'errore di `page.ParseSort` è la causa |
+| `API-PANIC` | 500 | `coreapi.CodePanic` | `guard.go` (`recoverer`) | un handler è andato in panic: la risposta è un DefaultError, lo stack e la richiesta sono nel log |
+| `API-BODY-TOO-LARGE` | 413 | `coreapi.CodeBodyTooLarge` | `validatormiddleware.go` (`ValidatorHandler`) | body oltre `max-body-bytes` |
+| `API-BODY-READ` | 400 | `coreapi.CodeBodyRead` | `validatormiddleware.go` (`ValidatorHandler`) | body della richiesta non leggibile per intero (connessione interrotta) |
 | `ERR_VALIDATION` | **400** | `core.ErrValidation` | `error.go:73` | validazione della richiesta fatta da huma (422 in ingresso) riscritta con **status 400**; il messaggio unisce quello di huma e gli errori di campo |
 | `API-FORBIDDEN` | 403 | `authorization.CodeForbiddenRole` | `authorization/middleware.go:135` | nessuno dei ruoli presentati abilita la rotta |
 | `API-CTX-FORBIDDEN` | 403 | `authorization.CodeForbiddenCtx` | `authorization/middleware.go:139` | il context header non è autorizzato |
