@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/httpx"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/observability"
 	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/fx"
@@ -37,13 +38,13 @@ func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) *chi.Mux {
 		// appeso prima di quello del server, quindi gira prima del listen.
 		OnStart: func(context.Context) error {
 			mux.Handle("/metrics", promhttp.Handler())
-			mux.Handle("/health", core.HealthHandler)
+			mux.Handle("/health", observability.HealthHandler)
 			return nil
 		},
 	})
 	// Listen in OnStart, Shutdown col context dell'hook, e un accept loop che muore fa uscire il
 	// processo: prima qui si loggava e basta, contando su una probe su /health servita dallo
 	// stesso server morto.
-	core.ServeOnLifecycle(lc, sh, srv, "api")
+	httpx.ServeOnLifecycle(lc, sh, srv, "api")
 	return mux
 }

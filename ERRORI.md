@@ -8,9 +8,9 @@ la maggior parte dei codici che il client vede arriva dai layer sottostanti (bus
 > `Ambit = "go-core-api"` (costante `coreapi.Ambit`); nel sottopackage `authorization` la
 > costante è ripetuta (`ambit`) perché quel package non importa il root.
 
-## Mapping ApplicationError → risposta HTTP
+## Mapping core.Error → risposta HTTP
 
-`ManageBusinessError(e *core.ApplicationError) error` (`error.go:19`) traduce lo status:
+`ManageBusinessError(e *core.Error) error` (`error.go:19`) traduce lo status:
 
 | `StatusCode` | Risposta Huma |
 |---|---|
@@ -26,7 +26,7 @@ Il body è sempre un `DefaultError`:
 { "ambit": "go-core-mongo", "code": "MONGO-FILTER", "message": "..." }
 ```
 
-`configureError()` sostituisce `huma.NewError`: se fra gli errori c'è un `*core.ApplicationError`
+`configureError()` sostituisce `huma.NewError`: se fra gli errori c'è un `*core.Error`
 (cercato con `errors.As`, quindi anche avvolto) il body riporta **i suoi** `Ambit`/`Code`/`Message`
 e il **suo** status. Il campo `cause` è non esportato: nel JSON non compare mai.
 
@@ -38,7 +38,7 @@ e il **suo** status. Il campo `cause` è non esportato: nel JSON non compare mai
 | `ERR_VALIDATION` | **400** | `core.ErrValidation` | `error.go:73` | validazione della richiesta fatta da huma (422 in ingresso) riscritta con **status 400**; il messaggio unisce quello di huma e gli errori di campo |
 | `API-FORBIDDEN` | 403 | `authorization.CodeForbiddenRole` | `authorization/middleware.go:135` | nessuno dei ruoli presentati abilita la rotta |
 | `API-CTX-FORBIDDEN` | 403 | `authorization.CodeForbiddenCtx` | `authorization/middleware.go:139` | il context header non è autorizzato |
-| `API-TOKEN-CRYPT` | 500 | `authorization.CodeTokenEncryption` | `authorization/token.go:112` | cifratura del token fallita; l'errore di `core.Encrypt` è la causa |
+| `API-TOKEN-CRYPT` | 500 | `authorization.CodeTokenEncryption` | `authorization/token.go:112` | cifratura del token fallita; l'errore di `utils.Encrypt` è la causa |
 
 ### Cambiamenti rispetto al censimento precedente
 

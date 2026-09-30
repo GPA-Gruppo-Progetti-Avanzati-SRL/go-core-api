@@ -185,7 +185,7 @@ con `ambit`/`code`/`message`, codici `API-FORBIDDEN` e `API-CTX-FORBIDDEN` — m
 come le altre.
 
 ```go
-func ManageBusinessError(e *core.ApplicationError) error
+func ManageBusinessError(e *core.Error) error
 ```
 
 Traduce l'`ApplicationError` di go-core-app nella error response Huma, con lo status del `StatusCode`

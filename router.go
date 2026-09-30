@@ -7,6 +7,7 @@ import (
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/observability"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
@@ -105,7 +106,7 @@ func newRouter(cm *chi.Mux, cfg *Config) *Router {
 		// condivisa con le rotte dell'applicazione: develop-mode è l'unico gate, quindi in
 		// produzione (develop-mode: false) /debug/pprof/* non è proprio registrato.
 		// L'equivalente per i processi senza API è `metrics.pprof` di go-core-app, sulla 2112.
-		cm.Mount("/debug/pprof", core.ProfilingHandler())
+		cm.Mount("/debug/pprof", observability.ProfilingHandler())
 	}
 
 	r.Api.UseMiddleware(reporter.MetricsHandler)

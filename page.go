@@ -1,7 +1,7 @@
 package coreapi
 
 import (
-	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/page"
 )
 
@@ -23,7 +23,7 @@ type PagingRequest struct {
 
 // GetSort parses the Sort query param into a SortRequest.
 // Returns nil without error when Sort is empty.
-func (p *PagingRequest) GetSort() (page.SortRequest, *core.ApplicationError) {
+func (p *PagingRequest) GetSort() (page.SortRequest, *core.Error) {
 	s, err := page.ParseSort(p.Sort)
 	if err != nil {
 		return nil, core.BusinessError().WithAmbit(Ambit).WithCode(CodeSort).WithCause(err)

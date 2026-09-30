@@ -2,6 +2,7 @@ package coreapi
 
 import (
 	"errors"
+
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -17,7 +18,7 @@ const (
 	CodeSort = "ERR-SORT" // query param `sort` non parsabile
 )
 
-func ManageBusinessError(e *core.ApplicationError) error {
+func ManageBusinessError(e *core.Error) error {
 
 	switch e.StatusCode {
 	case 400:
@@ -57,7 +58,7 @@ func configureError() {
 	huma.NewError = func(status int, message string, errs ...error) huma.StatusError {
 		if len(errs) > 0 {
 			err := errs[0]
-			var ev *core.ApplicationError
+			var ev *core.Error
 			switch {
 			case errors.As(err, &ev):
 				return &DefaultError{
