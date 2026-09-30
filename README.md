@@ -299,6 +299,7 @@ config:
       proxy:
         - mount-path: /legacy
           url: http://legacy-service:8080
+          response-header-timeout: 30s   # default
           headers:
             - key: X-Forwarded-By
               value: my-service
@@ -354,6 +355,19 @@ Lo shutdown è agganciato al lifecycle fx (`srv.Shutdown` in `OnStop`).
 
 Ogni voce di `proxy:` monta un `httputil.ReverseProxy` sul `mount-path`, con gli header aggiuntivi
 indicati. Serve a esporre servizi legacy dietro lo stesso host dell'API.
+
+- **`url`** è `scheme://host[:porta]`: `https://legacy:8443` parla TLS col backend, `legacy:8080` (senza
+  scheme, la forma storica) vale http. Prima lo scheme era `http` fisso, quindi un backend https
+  riceveva la richiesta in chiaro. Un `url` non valido — vuoto, scheme diverso da http/https, **con un
+  path**, che verrebbe ignorato — **ferma l'avvio**.
+- **`response-header-timeout`** (default 30s, negativo = nessun limite) è l'attesa massima della
+  risposta del backend, oltre la quale il client riceve 502. Il transport di default non ne aveva una:
+  un backend che accetta la connessione e tace teneva occupata la richiesta fino al `write-timeout`.
+- Il proxy ha il proprio **span OTel** e propaga il contesto di tracing al backend.
+- **Non attraversa i middleware huma**: metriche huma, validazione e **autorizzazione** non si
+  applicano, perché il proxy è montato sul mux chi e non è un'operazione. Valgono il recover e il limite
+  al body. Un backend esposto così è raggiungibile da chiunque raggiunga l'API: se serve un controllo
+  d'accesso, è del backend.
 
 ---
 

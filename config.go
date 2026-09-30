@@ -74,9 +74,13 @@ type Server struct {
 }
 
 type ProxyConfig struct {
-	MountPath string    `yaml:"mount-path" mapstructure:"mount-path" json:"mount-path"`
-	Url       string    `yaml:"url" mapstructure:"url" json:"url"`
-	Headers   []*Header `yaml:"headers" mapstructure:"headers" json:"headers"`
+	MountPath string `yaml:"mount-path" mapstructure:"mount-path" json:"mount-path"`
+	// Url è la destinazione, `scheme://host[:porta]`; senza scheme vale http (`legacy:8080`).
+	Url     string    `yaml:"url" mapstructure:"url" json:"url"`
+	Headers []*Header `yaml:"headers" mapstructure:"headers" json:"headers"`
+	// ResponseHeaderTimeout è l'attesa massima degli header di risposta del backend (502 oltre).
+	// 0 vale DefaultProxyResponseHeaderTimeout (30s), un negativo disattiva il limite.
+	ResponseHeaderTimeout time.Duration `yaml:"response-header-timeout" mapstructure:"response-header-timeout" json:"response-header-timeout"`
 }
 
 type Header struct {

@@ -12,7 +12,7 @@ import (
 	"go.uber.org/fx"
 )
 
-func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) *chi.Mux {
+func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) (*chi.Mux, error) {
 	mux := chi.NewRouter()
 	server := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
@@ -21,7 +21,11 @@ func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) *chi.Mux {
 	mux.Use(recoverer, limitBody(orDefault(cfg.MaxBodyBytes, DefaultMaxBodyBytes)))
 
 	for _, pc := range cfg.Proxy {
-		mux.Mount(pc.MountPath, NewReverseProxy(pc))
+		proxy, err := NewReverseProxy(pc)
+		if err != nil {
+			return nil, err
+		}
+		mux.Mount(pc.MountPath, proxy)
 	}
 	srv := &http.Server{
 		Addr:              server,
@@ -49,5 +53,5 @@ func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) *chi.Mux {
 	// processo: prima qui si loggava e basta, contando su una probe su /health servita dallo
 	// stesso server morto.
 	httpx.ServeOnLifecycle(lc, sh, srv, "api")
-	return mux
+	return mux, nil
 }
