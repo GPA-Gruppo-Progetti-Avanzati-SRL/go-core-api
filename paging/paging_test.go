@@ -1,4 +1,4 @@
-package coreapi
+package paging
 
 import (
 	"errors"

@@ -5,37 +5,14 @@ import (
 	"maps"
 	"reflect"
 
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/swagger"
-	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/middleware"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/opem"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/swagger"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/observability"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
-	prom "github.com/prometheus/client_golang/prometheus"
-	"github.com/slok/go-http-metrics/metrics/prometheus"
-	"github.com/slok/go-http-metrics/middleware"
 )
-
-// idempotentRegisterer wraps a prometheus.Registerer to silently ignore
-// AlreadyRegisteredError. This allows NewRouter to be called multiple times
-// (e.g., in tests) without panicking on duplicate metric registration.
-type idempotentRegisterer struct{ prom.Registerer }
-
-func (r idempotentRegisterer) Register(c prom.Collector) error {
-	err := r.Registerer.Register(c)
-	if _, ok := err.(prom.AlreadyRegisteredError); ok {
-		return nil
-	}
-	return err
-}
-
-func (r idempotentRegisterer) MustRegister(cs ...prom.Collector) {
-	for _, c := range cs {
-		if err := r.Register(c); err != nil {
-			panic(err)
-		}
-	}
-}
 
 type Router struct {
 	Api huma.API
@@ -88,20 +65,12 @@ func newRouter(cm *chi.Mux, cfg *Config) *Router {
 	// Nota: la configurazione Security non è più presente nel Config corrente;
 	// lasciamo Components e Security invariati.
 
-	reporter := &MetricsReporter{Middleware: middleware.New(middleware.Config{
-		Service:  core.AppName,
-		Recorder: prometheus.NewRecorder(prometheus.Config{Registry: idempotentRegisterer{prom.DefaultRegisterer}}),
-	}),
-	}
 	r.Api = humachi.New(cm, config)
 
 	// Endpoint di discovery: abilitati solo in develop-mode.
 	// Registrati su chi direttamente: no auth, non appaiono nell'OpenAPI spec.
 	if cfg.DevelopMode {
-		cm.Get("/capabilities", capabilitiesHandler(r.Api))
-		cm.Get("/capabilities.yaml", capabilitiesYAMLHandler(r.Api))
-		cm.Get("/acl.mongo.js", capabilitiesMongoHandler(r.Api))
-		cm.Get("/acl.sql", capabilitiesSQLHandler(r.Api))
+		opem.Mount(cm, r.Api)
 		// pprof sta qui e non su httpserver.go perché in mode API la porta è quella PUBBLICA,
 		// condivisa con le rotte dell'applicazione: develop-mode è l'unico gate, quindi in
 		// produzione (develop-mode: false) /debug/pprof/* non è proprio registrato.
@@ -109,9 +78,9 @@ func newRouter(cm *chi.Mux, cfg *Config) *Router {
 		cm.Mount("/debug/pprof", observability.ProfilingHandler())
 	}
 
-	r.Api.UseMiddleware(reporter.MetricsHandler)
-	r.Api.UseMiddleware(tracingHandler)
-	r.Api.UseMiddleware(r.ValidatorHandler)
+	r.Api.UseMiddleware(middleware.Metrics())
+	r.Api.UseMiddleware(middleware.Tracing)
+	r.Api.UseMiddleware(middleware.Validator(r.Api))
 	configureError()
 	return r
 }
@@ -151,12 +120,6 @@ func withDefaultResponses(op Operation) Operation {
 func SerializeSchema(input any) *Schema {
 	return ApiRegistry.Schema(reflect.TypeOf(input), true, "")
 
-}
-
-func WithBusiness[D, Req, Resp any](dep D, fn func(context.Context, *Req, D) (*Resp, error)) func(context.Context, *Req) (*Resp, error) {
-	return func(ctx context.Context, req *Req) (*Resp, error) {
-		return fn(ctx, req, dep)
-	}
 }
 
 // RegisterWithBusiness registra un'operazione Huma iniettando la dipendenza di

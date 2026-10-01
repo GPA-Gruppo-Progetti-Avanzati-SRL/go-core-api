@@ -1,4 +1,6 @@
-package coreapi
+// Package proxy costruisce i reverse proxy delle voci `proxy:` della configurazione di go-core-api.
+// I tipi di configurazione sono riesportati dalla radice (coreapi.ProxyConfig, coreapi.Header).
+package proxy
 
 import (
 	"fmt"
@@ -12,18 +14,35 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-// DefaultProxyResponseHeaderTimeout è l'attesa massima degli header di risposta del backend di un
-// proxy (vedi ProxyConfig.ResponseHeaderTimeout).
-const DefaultProxyResponseHeaderTimeout = 30 * time.Second
+// DefaultResponseHeaderTimeout è l'attesa massima degli header di risposta del backend di un
+// proxy (vedi Config.ResponseHeaderTimeout).
+const DefaultResponseHeaderTimeout = 30 * time.Second
 
-// NewReverseProxy costruisce il reverse proxy di una voce di `proxy:`. Ritorna errore se `url` non è
+// Config è una voce di `proxy:`.
+type Config struct {
+	MountPath string `yaml:"mount-path" mapstructure:"mount-path" json:"mount-path"`
+	// Url è la destinazione, `scheme://host[:porta]`; senza scheme vale http (`legacy:8080`).
+	Url     string    `yaml:"url" mapstructure:"url" json:"url"`
+	Headers []*Header `yaml:"headers" mapstructure:"headers" json:"headers"`
+	// ResponseHeaderTimeout è l'attesa massima degli header di risposta del backend (502 oltre).
+	// 0 vale DefaultResponseHeaderTimeout (30s), un negativo disattiva il limite.
+	ResponseHeaderTimeout time.Duration `yaml:"response-header-timeout" mapstructure:"response-header-timeout" json:"response-header-timeout"`
+}
+
+// Header è un header aggiunto a ogni richiesta inoltrata.
+type Header struct {
+	Key   string `yaml:"key" mapstructure:"key" json:"key"`
+	Value string `yaml:"value" mapstructure:"value" json:"value"`
+}
+
+// New costruisce il reverse proxy di una voce di `proxy:`. Ritorna errore se `url` non è
 // una destinazione valida: l'app non parte, invece di rispondere 502 a ogni richiesta.
 //
 // Non attraversa i middleware huma — metriche, validazione, autorizzazione — perché è montato sul
 // mux chi, fuori dalle operazioni: la catena che vale per il proxy è quella del mux (recover, limite
 // al body) più lo span OTel aggiunto qui. Un backend esposto così è raggiungibile da chiunque
 // raggiunga l'API: l'autorizzazione, se serve, è del backend.
-func NewReverseProxy(pc *ProxyConfig) (http.Handler, error) {
+func New(pc *Config) (http.Handler, error) {
 	target, err := proxyTarget(pc.Url)
 	if err != nil {
 		return nil, fmt.Errorf("coreapi: proxy %q: %w", pc.MountPath, err)
@@ -33,7 +52,13 @@ func NewReverseProxy(pc *ProxyConfig) (http.Handler, error) {
 	// connessione e non risponde tiene occupata la richiesta fino al write-timeout del server, e con
 	// lei una connessione verso il backend. I timeout di dial e handshake del default restano.
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.ResponseHeaderTimeout = orDefault(pc.ResponseHeaderTimeout, DefaultProxyResponseHeaderTimeout)
+	// Stessa convenzione dei timeout del server: 0 vale il default, un negativo disattiva.
+	switch timeout := pc.ResponseHeaderTimeout; {
+	case timeout == 0:
+		transport.ResponseHeaderTimeout = DefaultResponseHeaderTimeout
+	case timeout > 0:
+		transport.ResponseHeaderTimeout = timeout
+	}
 
 	proxy := &httputil.ReverseProxy{
 		// Rewrite e non Director (deprecata da Go 1.26): riceve la richiesta in ingresso (In) e

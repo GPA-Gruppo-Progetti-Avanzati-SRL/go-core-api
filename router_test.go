@@ -265,6 +265,31 @@ func TestPprofSoloInDevelopMode(t *testing.T) {
 	})
 }
 
+// Gli endpoint di discovery (internal/opem) sono montati solo in develop-mode, come pprof.
+func TestDiscoverySoloInDevelopMode(t *testing.T) {
+	paths := []string{"/capabilities", "/capabilities.yaml", "/acl.mongo.js", "/acl.sql"}
+	for _, develop := range []bool{false, true} {
+		mux := chi.NewRouter()
+		_ = newRouter(mux, &Config{DevelopMode: develop})
+		want := http.StatusNotFound
+		if develop {
+			want = http.StatusOK
+		}
+		for _, p := range paths {
+			rr := httptest.NewRecorder()
+			mux.ServeHTTP(rr, httptest.NewRequest(http.MethodGet, p, nil))
+			assert.Equal(t, want, rr.Code, "GET %s con develop-mode=%v", p, develop)
+		}
+	}
+}
+
+// DefaultError è un alias del tipo di internal/errors: lo schema OpenAPI deve continuare a
+// chiamarsi DefaultError, perché huma lo nomina dal reflect.Type e i client generati lo usano.
+func TestDefaultError_NomeDelloSchema(t *testing.T) {
+	assert.Contains(t, ApiRegistry.Map(), "DefaultError")
+	assert.Equal(t, "#/components/schemas/DefaultError", ErrorContent[ApplicationJson].Schema.Ref)
+}
+
 // Lo status del core.Error arriva al client qualunque sia: prima solo 400/404/422/500 passavano, e un
 // 409 o un 403 dell'applicazione diventavano un 500 "Errore Sconosciuto".
 func TestManageBusinessError_ConservaLoStatus(t *testing.T) {

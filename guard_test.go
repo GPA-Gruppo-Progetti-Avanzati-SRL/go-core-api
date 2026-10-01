@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/middleware"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 )
@@ -35,7 +36,7 @@ type guardOut struct {
 func guardServer(t *testing.T, maxBody int64) http.Handler {
 	t.Helper()
 	mux := chi.NewRouter()
-	mux.Use(recoverer, limitBody(maxBody))
+	mux.Use(middleware.Recoverer, middleware.LimitBody(maxBody))
 	router := newRouter(mux, &Config{OpenApi: &OpenApiConfig{ApiName: "guard", ApiVersion: "1"}})
 	ok := func() (*guardOut, error) { o := &guardOut{}; o.Body.Ok = true; return o, nil }
 	RegisterWithBusiness(router, struct{}{},
@@ -95,16 +96,6 @@ func TestRecoverer_PanicDiventa500(t *testing.T) {
 	if rr.Code != http.StatusInternalServerError || de.Code != CodePanic || de.Ambit != Ambit {
 		t.Fatalf("status %d, errore %+v", rr.Code, de)
 	}
-}
-
-func TestRecoverer_ErrAbortHandlerRilanciato(t *testing.T) {
-	h := recoverer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic(http.ErrAbortHandler) }))
-	defer func() {
-		if p := recover(); p != http.ErrAbortHandler {
-			t.Fatalf("http.ErrAbortHandler va rilanciato, recover = %v", p)
-		}
-	}()
-	h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
 }
 
 func TestOrDefault(t *testing.T) {

@@ -1,35 +1,31 @@
-package coreapi
+// Package opem serve gli endpoint di discovery di develop-mode, con le capability dell'app nel
+// formato del frontdoor OPEM (opem_acl_cap_def, `_et: cap-def`) e del discovery loader di app-fe:
+// GET /capabilities, /capabilities.yaml, /acl.mongo.js, /acl.sql.
+//
+// Le capability vengono da capability.Capabilities; qui c'è solo la serializzazione, che è di chi
+// quello schema lo legge.
+package opem
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
-	"unicode"
 
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/capability"
 	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
 
-// CapabilityEntry è il formato JSON esposto dall'endpoint GET /capabilities.
-//
-// È esportata insieme a Capabilities e CapabilityID perché la generazione dei seed ACL non è
-// tutta di questo modulo: qui sta ciò che solo qui si può sapere — quali capability l'applicazione
-// espone, dedotte dal registry huma — mentre la serializzazione verso uno schema appartiene a chi
-// quello schema lo legge.
-// Corrisponde al formato atteso dal discovery loader di app-fe.
-// id:          ID UPPER_SNAKE locale (prefissato dal gateway con il proxy id)
-// operationId: operationId originale Huma per Match() nel backend; omesso se uguale a id
-// category:    "api" | "action_api"
-type CapabilityEntry struct {
-	ID          string `json:"id"`
-	Category    string `json:"category"`
-	Description string `json:"description,omitempty"`
-	OperationID string `json:"operationId,omitempty"`
-	Endpoint    string `json:"endpoint,omitempty"`
-	Method      string `json:"method,omitempty"`
+// Mount registra gli endpoint di discovery su r, direttamente sul mux chi: nessuna autorizzazione,
+// e non compaiono nell'OpenAPI spec. Chi la chiama decide il gate (develop-mode).
+func Mount(r chi.Router, api huma.API) {
+	r.Get("/capabilities", capabilitiesHandler(api))
+	r.Get("/capabilities.yaml", capabilitiesYAMLHandler(api))
+	r.Get("/acl.mongo.js", capabilitiesMongoHandler(api))
+	r.Get("/acl.sql", capabilitiesSQLHandler(api))
 }
 
 // capDefDoc è il documento cap-def per YAML/Mongo, allineato al formato ng-core-ui.
@@ -45,29 +41,10 @@ type capDefDoc struct {
 	SysInfo     string `json:"sys_info"`
 }
 
-// actionCapabilities raccoglie le capability action_api registrate dall'applicazione. Il mutex c'è
-// perché la registrazione e la lettura (GET /capabilities) possono incontrarsi a runtime.
-var (
-	actionCapabilitiesMu sync.Mutex
-	actionCapabilities   []CapabilityEntry
-)
-
-// RegisterActionCapability registra una capability action_api inclusa nella risposta
-// di GET /capabilities. Chiamare durante l'inizializzazione dell'applicazione.
-func RegisterActionCapability(id, description string) {
-	actionCapabilitiesMu.Lock()
-	defer actionCapabilitiesMu.Unlock()
-	actionCapabilities = append(actionCapabilities, CapabilityEntry{
-		ID:          id,
-		Category:    "action_api",
-		Description: description,
-	})
-}
-
 // capabilitiesHandler serve GET /capabilities → JSON.
 func capabilitiesHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := Capabilities(api)
+		entries := capability.Capabilities(api)
 		data, err := json.Marshal(entries)
 		if err != nil {
 			log.Error().Err(err).Msg("capabilities: marshal error")
@@ -83,7 +60,7 @@ func capabilitiesHandler(api huma.API) http.HandlerFunc {
 // capabilitiesYAMLHandler serve GET /capabilities.yaml → YAML cap_defs + cap_groups.
 func capabilitiesYAMLHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := Capabilities(api)
+		entries := capability.Capabilities(api)
 		w.Header().Set("Content-Type", "text/yaml")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(toCapabilitiesYAML(entries)))
@@ -93,30 +70,23 @@ func capabilitiesYAMLHandler(api huma.API) http.HandlerFunc {
 // capabilitiesMongoHandler serve GET /acl.mongo.js → script replaceOne upsert per MongoDB.
 func capabilitiesMongoHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := Capabilities(api)
+		entries := capability.Capabilities(api)
 		w.Header().Set("Content-Type", "application/javascript")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(toCapabilitiesMongo(entries)))
 	}
 }
 
-// CapabilityID costruisce l'id strutturato di una capability: cap:<appID>:api:<id>. È la
-// convenzione con cui le capability si nominano in tutti gli ACL della catena, quindi chi genera
-// un seed deve usarla e non reinventarla.
-func CapabilityID(appID, id string) string {
-	return fmt.Sprintf("cap:%s:api:%s", appID, strings.ToLower(id))
-}
-
 // toCapabilitiesYAML serializza le capability nel formato cap_defs + cap_groups
 // allineato a ng-core-ui toRoutesYaml.
-func toCapabilitiesYAML(entries []CapabilityEntry) string {
+func toCapabilitiesYAML(entries []capability.CapabilityEntry) string {
 	appID := core.AppName
 	var sb strings.Builder
 
 	sb.WriteString("cap_defs:\n")
 	for _, e := range entries {
 		fmt.Fprintf(&sb, "  - category: %s\n", e.Category)
-		fmt.Fprintf(&sb, "    _id: %q\n", CapabilityID(appID, e.ID))
+		fmt.Fprintf(&sb, "    _id: %q\n", capability.CapabilityID(appID, e.ID))
 		fmt.Fprintf(&sb, "    app: %q\n", appID)
 		if e.Description != "" {
 			fmt.Fprintf(&sb, "    description: %q\n", e.Description)
@@ -135,7 +105,7 @@ func toCapabilitiesYAML(entries []CapabilityEntry) string {
 	groupID := fmt.Sprintf("grp:%s:ALL", appID)
 	fmt.Fprintf(&sb, "cap_groups:\n  - _id: %q\n    description: \"\"\n    capabilities:\n", groupID)
 	for _, e := range entries {
-		fmt.Fprintf(&sb, "      - %q\n", CapabilityID(appID, e.ID))
+		fmt.Fprintf(&sb, "      - %q\n", capability.CapabilityID(appID, e.ID))
 	}
 
 	return sb.String()
@@ -143,7 +113,7 @@ func toCapabilitiesYAML(entries []CapabilityEntry) string {
 
 // toCapabilitiesMongo serializza le capability come script replaceOne upsert
 // allineato a ng-core-ui toRoutesMongo.
-func toCapabilitiesMongo(entries []CapabilityEntry) string {
+func toCapabilitiesMongo(entries []capability.CapabilityEntry) string {
 	appID := core.AppName
 	var sb strings.Builder
 
@@ -151,7 +121,7 @@ func toCapabilitiesMongo(entries []CapabilityEntry) string {
 
 	for _, e := range entries {
 		doc := capDefDoc{
-			ID:          CapabilityID(appID, e.ID),
+			ID:          capability.CapabilityID(appID, e.ID),
 			ET:          "cap-def",
 			App:         appID,
 			Category:    e.Category,
@@ -169,7 +139,7 @@ func toCapabilitiesMongo(entries []CapabilityEntry) string {
 		)
 		fmt.Fprintf(&sb,
 			"db.getCollection(COLLECTION).replaceOne(\n    { _id: %s },\n    %s,\n    { upsert: true }\n)\n\n",
-			jsonStr(CapabilityID(appID, e.ID)), body,
+			jsonStr(capability.CapabilityID(appID, e.ID)), body,
 		)
 	}
 
@@ -177,7 +147,7 @@ func toCapabilitiesMongo(entries []CapabilityEntry) string {
 	groupID := fmt.Sprintf("grp:%s:ALL", appID)
 	var caps []string
 	for _, e := range entries {
-		caps = append(caps, fmt.Sprintf("        %s", jsonStr(CapabilityID(appID, e.ID))))
+		caps = append(caps, fmt.Sprintf("        %s", jsonStr(capability.CapabilityID(appID, e.ID))))
 	}
 	groupDoc := fmt.Sprintf(
 		"{\n    _id: %s,\n    _et: \"cap-group\",\n    description: \"\",\n    capabilities: [\n%s\n    ],\n    sys_info: {\n        status: \"active\",\n        created_at: new Date(),\n        modified_at: new Date()\n    }\n}",
@@ -204,7 +174,7 @@ func sqlStr(s string) string {
 // capabilitiesSQLHandler serve GET /acl.sql → script INSERT upsert per SQL (PostgreSQL).
 func capabilitiesSQLHandler(api huma.API) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		entries := Capabilities(api)
+		entries := capability.Capabilities(api)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(toCapabilitiesSQL(entries)))
@@ -214,7 +184,7 @@ func capabilitiesSQLHandler(api huma.API) http.HandlerFunc {
 // toCapabilitiesSQL serializza le capability come script INSERT ... ON CONFLICT upsert
 // per le tabelle opem_acl_cap_def, opem_acl_cap_group e opem_acl_cap_group_def.
 // Sintassi: PostgreSQL / SQLite (ON CONFLICT ... DO UPDATE / DO NOTHING).
-func toCapabilitiesSQL(entries []CapabilityEntry) string {
+func toCapabilitiesSQL(entries []capability.CapabilityEntry) string {
 	appID := core.AppName
 	var sb strings.Builder
 
@@ -225,7 +195,7 @@ func toCapabilitiesSQL(entries []CapabilityEntry) string {
 	// ── cap_def ──────────────────────────────────────────────────────────────
 	sb.WriteString("-- cap_defs\n")
 	for _, e := range entries {
-		id := CapabilityID(appID, e.ID)
+		id := capability.CapabilityID(appID, e.ID)
 		name := e.Description
 		if name == "" {
 			name = e.ID
@@ -258,77 +228,9 @@ func toCapabilitiesSQL(entries []CapabilityEntry) string {
 		fmt.Fprintf(&sb,
 			"INSERT INTO opem_acl_cap_group_def (cap_group_id, cap_def_id) VALUES (%s, %s)\n"+
 				"ON CONFLICT (cap_group_id, cap_def_id) DO NOTHING;\n",
-			sqlStr(groupID), sqlStr(CapabilityID(appID, e.ID)),
+			sqlStr(groupID), sqlStr(capability.CapabilityID(appID, e.ID)),
 		)
 	}
 
 	return sb.String()
-}
-
-// Capabilities elenca le capability che l'applicazione espone: una per operazione huma registrata,
-// più le action_api dichiarate con RegisterActionCapability.
-func Capabilities(api huma.API) []CapabilityEntry {
-	openapi := api.OpenAPI()
-
-	type methodOp struct {
-		method string
-		op     *huma.Operation
-	}
-
-	var entries []CapabilityEntry
-	for path, item := range openapi.Paths {
-		candidates := []methodOp{
-			{"GET", item.Get},
-			{"POST", item.Post},
-			{"PUT", item.Put},
-			{"DELETE", item.Delete},
-			{"PATCH", item.Patch},
-		}
-		for _, mo := range candidates {
-			if mo.op == nil {
-				continue
-			}
-			capID := toUpperSnake(mo.op.OperationID)
-			desc := mo.op.Summary
-			if desc == "" {
-				desc = mo.op.Description
-			}
-			e := CapabilityEntry{
-				ID:          capID,
-				Category:    "api",
-				Description: desc,
-				Endpoint:    path,
-				Method:      mo.method,
-			}
-			if mo.op.OperationID != capID {
-				e.OperationID = mo.op.OperationID
-			}
-			entries = append(entries, e)
-		}
-	}
-
-	actionCapabilitiesMu.Lock()
-	entries = append(entries, actionCapabilities...)
-	actionCapabilitiesMu.Unlock()
-	return entries
-}
-
-// toUpperSnake converte camelCase/PascalCase in UPPER_SNAKE_CASE.
-// "GetPersons" → "GET_PERSONS", "InsertPerson" → "INSERT_PERSON"
-func toUpperSnake(s string) string {
-	if s == "" {
-		return s
-	}
-	runes := []rune(s)
-	out := make([]rune, 0, len(runes)+4)
-	for i, r := range runes {
-		if i > 0 && unicode.IsUpper(r) {
-			prev := runes[i-1]
-			if unicode.IsLower(prev) || (i+1 < len(runes) && unicode.IsLower(runes[i+1])) {
-				out = append(out, '_')
-			}
-		}
-		out = append(out, unicode.ToUpper(r))
-	}
-	return string(out)
 }

@@ -1,4 +1,4 @@
-package coreapi
+package middleware
 
 import (
 	"fmt"
@@ -20,7 +20,8 @@ import (
 // sono quelli dell'API. Un header nuovo che porta un segreto non si vede in una deny-list.
 var spanHeaders = []string{"Content-Type", "Accept", "User-Agent", "X-Request-Id", "X-Forwarded-For"}
 
-func tracingHandler(ctx huma.Context, next func(huma.Context)) {
+// Tracing è il middleware huma che apre lo span OTel della richiesta.
+func Tracing(ctx huma.Context, next func(huma.Context)) {
 	// Tutti gli header servono all'estrazione del contesto di tracing (traceparent, baggage), ma
 	// restano qui: sullo span vanno solo quelli di spanHeaders.
 	headers := http.Header{}

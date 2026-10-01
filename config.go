@@ -2,6 +2,8 @@ package coreapi
 
 import (
 	"time"
+
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/proxy"
 )
 
 type Config struct {
@@ -73,19 +75,13 @@ type Server struct {
 	Description string `yaml:"description" mapstructure:"description" json:"description"`
 }
 
-type ProxyConfig struct {
-	MountPath string `yaml:"mount-path" mapstructure:"mount-path" json:"mount-path"`
-	// Url è la destinazione, `scheme://host[:porta]`; senza scheme vale http (`legacy:8080`).
-	Url     string    `yaml:"url" mapstructure:"url" json:"url"`
-	Headers []*Header `yaml:"headers" mapstructure:"headers" json:"headers"`
-	// ResponseHeaderTimeout è l'attesa massima degli header di risposta del backend (502 oltre).
-	// 0 vale DefaultProxyResponseHeaderTimeout (30s), un negativo disattiva il limite.
-	ResponseHeaderTimeout time.Duration `yaml:"response-header-timeout" mapstructure:"response-header-timeout" json:"response-header-timeout"`
-}
+// ProxyConfig è una voce di `proxy:`: il reverse proxy che la serve sta in internal/proxy, il tipo
+// resta qui perché fa parte della Config.
+type ProxyConfig = proxy.Config
 
-type Header struct {
-	Key   string `yaml:"key" mapstructure:"key" json:"key"`
-	Value string `yaml:"value" mapstructure:"value" json:"value"`
-}
+// Header è un header aggiunto a ogni richiesta inoltrata da un proxy.
+type Header = proxy.Header
 
-// AuthorizationConfig definisce il comportamento del middleware autorizzativo.
+// DefaultProxyResponseHeaderTimeout è l'attesa massima degli header di risposta del backend di un
+// proxy (vedi ProxyConfig.ResponseHeaderTimeout).
+const DefaultProxyResponseHeaderTimeout = proxy.DefaultResponseHeaderTimeout

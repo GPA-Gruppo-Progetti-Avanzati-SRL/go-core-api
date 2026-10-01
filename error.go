@@ -5,23 +5,30 @@ import (
 	"net/http"
 	"sync"
 
+	apierrors "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/errors"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
 )
 
-const ApplicationJson = "application/json"
-
-// Ambit è la libreria di origine dell'errore: i costruttori di core riempiono Ambit con
-// l'AppName, cioè con l'app che l'errore lo riceve, quindi un errore nato qui deve dirlo.
-const Ambit = "go-core-api"
-
-// Codici emessi dal modulo. Tutti finiscono nel campo `code` del DefaultError.
+// Tipo e codici vivono in internal/errors, la foglia che importano anche i middleware interni; qui
+// sono riesportati come alias perché sono superficie pubblica. Alias e non tipo nuovo: lo schema
+// OpenAPI prende il nome dal reflect.Type, e resta DefaultError.
 const (
-	CodeSort         = "ERR-SORT"           // query param `sort` non parsabile
-	CodePanic        = "API-PANIC"          // 500: un handler è andato in panic (recoverer)
-	CodeBodyTooLarge = "API-BODY-TOO-LARGE" // 413: body oltre `max-body-bytes`
-	CodeBodyRead     = "API-BODY-READ"      // 400: body della richiesta non leggibile
+	ApplicationJson = apierrors.ApplicationJson
+
+	// Ambit è la libreria di origine dell'errore: i costruttori di core riempiono Ambit con
+	// l'AppName, cioè con l'app che l'errore lo riceve, quindi un errore nato qui deve dirlo.
+	Ambit = apierrors.Ambit
+
+	// Codici emessi dal modulo. Tutti finiscono nel campo `code` del DefaultError.
+	CodeSort         = apierrors.CodeSort         // query param `sort` non parsabile
+	CodePanic        = apierrors.CodePanic        // 500: un handler è andato in panic (recoverer)
+	CodeBodyTooLarge = apierrors.CodeBodyTooLarge // 413: body oltre `max-body-bytes`
+	CodeBodyRead     = apierrors.CodeBodyRead     // 400: body della richiesta non leggibile
 )
+
+// DefaultError è il body di ogni risposta d'errore dell'API.
+type DefaultError = apierrors.DefaultError
 
 // ManageBusinessError converte un *core.Error nella risposta d'errore huma, con lo status del
 // core.Error. Prima conosceva solo 400/404/422/500 e ogni altro status — un 409 di conflitto, un 403
@@ -39,21 +46,6 @@ func ManageBusinessError(e *core.Error) error {
 var ErrorContent = map[string]*MediaType{ApplicationJson: {
 	Schema: SerializeSchema(DefaultError{}),
 }}
-
-type DefaultError struct {
-	Status  int    `json:"-"`
-	Ambit   string `json:"ambit"`
-	Code    string `json:"code" yaml:"code"`
-	Message string `json:"message" yaml:"message"`
-}
-
-func (e *DefaultError) Error() string {
-	return e.Message
-}
-
-func (e *DefaultError) GetStatus() int {
-	return e.Status
-}
 
 // configureErrorOnce: huma.NewError è una variabile di package, e configureError la avvolge. Senza
 // Once ogni newRouter avvolgeva la versione già avvolta — con più router nello stesso processo, o in

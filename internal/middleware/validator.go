@@ -1,4 +1,4 @@
-package coreapi
+package middleware
 
 import (
 	"bytes"
@@ -11,19 +11,26 @@ import (
 	"reflect"
 	"time"
 
+	apierrors "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/errors"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/rs/zerolog/log"
 )
 
-func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
+// Validator ritorna il middleware huma che applica i tag `validate:` (core.ValidateStruct) al body
+// delle operazioni che ne dichiarano uno, rileggendo il tipo Go dal registry degli schemi di api.
+func Validator(api huma.API) func(huma.Context, func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) { validate(api, ctx, next) }
+}
 
-	vc := &ValidatorContext{c: ctx}
+func validate(api huma.API, ctx huma.Context, next func(huma.Context)) {
+
+	vc := &validatorContext{c: ctx}
 	if vc.Operation().RequestBody == nil {
 		next(vc)
 		return
 	}
-	registry := r.Api.OpenAPI().Components.Schemas
+	registry := api.OpenAPI().Components.Schemas
 
 	content, ok := ctx.Operation().RequestBody.Content["application/json"]
 	if !ok || content.Schema == nil || content.Schema.Ref == "" {
@@ -39,7 +46,7 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 		next(vc)
 		return
 	}
-	log.Trace().Msgf("ValidatorHandler type: %+v", t)
+	log.Trace().Msgf("validator type: %+v", t)
 	input := reflect.New(t).Interface()
 	b, err := vc.readBody()
 	if err != nil {
@@ -47,7 +54,7 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 		// passato all'handler: la validazione sarebbe stata saltata e l'handler avrebbe lavorato su
 		// un body troncato. Prima si proseguiva con next(vc).
 		status, code, msg := bodyReadError(err)
-		writeHumaError(vc, status, code, msg)
+		apierrors.WriteHuma(vc, status, code, msg)
 		return
 	}
 	if berr := json.Unmarshal(b, input); berr != nil {
@@ -57,7 +64,7 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 		return
 	}
 
-	log.Trace().Msgf("ValidatorHandler Input: %+v", input)
+	log.Trace().Msgf("validator Input: %+v", input)
 	// Valida i dati se non sono nulli
 	if input != nil {
 		if verr := core.ValidateStruct(input); verr != nil {
@@ -82,58 +89,58 @@ func (r *Router) ValidatorHandler(ctx huma.Context, next func(huma.Context)) {
 
 }
 
-type ValidatorContext struct {
+type validatorContext struct {
 	c       huma.Context
 	br      *bytes.Reader
 	buf     []byte
 	readErr error
 }
 
-func (r *ValidatorContext) TLS() *tls.ConnectionState {
+func (r *validatorContext) TLS() *tls.ConnectionState {
 	return r.c.TLS()
 
 }
 
-func (r *ValidatorContext) Version() huma.ProtoVersion {
+func (r *validatorContext) Version() huma.ProtoVersion {
 	return r.c.Version()
 }
 
-func (r *ValidatorContext) Operation() *huma.Operation {
+func (r *validatorContext) Operation() *huma.Operation {
 	return r.c.Operation()
 }
 
-func (r *ValidatorContext) Host() string {
+func (r *validatorContext) Host() string {
 	return r.c.Host()
 }
 
-func (r *ValidatorContext) RemoteAddr() string {
+func (r *validatorContext) RemoteAddr() string {
 	return r.c.RemoteAddr()
 }
 
-func (r *ValidatorContext) URL() url.URL {
+func (r *validatorContext) URL() url.URL {
 	return r.c.URL()
 }
 
-func (r *ValidatorContext) Param(name string) string {
+func (r *validatorContext) Param(name string) string {
 	return r.c.Param(name)
 }
 
-func (r *ValidatorContext) Query(name string) string {
+func (r *validatorContext) Query(name string) string {
 	return r.c.Query(name)
 }
 
-func (r *ValidatorContext) Header(name string) string {
+func (r *validatorContext) Header(name string) string {
 	return r.c.Header(name)
 }
 
-func (r *ValidatorContext) EachHeader(cb func(name string, value string)) {
+func (r *validatorContext) EachHeader(cb func(name string, value string)) {
 	r.c.EachHeader(cb)
 }
 
 // readBody legge il body una volta sola, lo tiene in memoria per i lettori successivi e ritorna
 // l'errore di lettura: un body troncato (oltre `max-body-bytes`, o una connessione interrotta) deve
 // fermare la richiesta, non arrivare all'handler come se fosse completo.
-func (r *ValidatorContext) readBody() ([]byte, error) {
+func (r *validatorContext) readBody() ([]byte, error) {
 	if r.br != nil {
 		return r.buf, r.readErr
 	}
@@ -147,7 +154,7 @@ func (r *ValidatorContext) readBody() ([]byte, error) {
 	return b, err
 }
 
-func (r *ValidatorContext) BodyReader() io.Reader {
+func (r *validatorContext) BodyReader() io.Reader {
 	if _, err := r.readBody(); err != nil {
 		log.Warn().Err(err).Msg("lettura del body incompleta")
 	}
@@ -160,52 +167,38 @@ func (r *ValidatorContext) BodyReader() io.Reader {
 	return r.br
 }
 
-func (r *ValidatorContext) GetMultipartForm() (*multipart.Form, error) {
+func (r *validatorContext) GetMultipartForm() (*multipart.Form, error) {
 	return r.c.GetMultipartForm()
 }
 
-func (r *ValidatorContext) SetReadDeadline(time time.Time) error {
+func (r *validatorContext) SetReadDeadline(time time.Time) error {
 	//Already read body so it becomes "moot" and dangerous to set a deadline
 	return nil
 }
 
-func (r *ValidatorContext) SetStatus(code int) {
+func (r *validatorContext) SetStatus(code int) {
 	r.c.SetStatus(code)
 }
 
-func (r *ValidatorContext) Status() int {
+func (r *validatorContext) Status() int {
 	return r.c.Status()
 }
 
-func (r *ValidatorContext) SetHeader(name, value string) {
+func (r *validatorContext) SetHeader(name, value string) {
 	r.c.SetHeader(name, value)
 }
 
-func (r *ValidatorContext) AppendHeader(name, value string) {
+func (r *validatorContext) AppendHeader(name, value string) {
 	r.c.AppendHeader(name, value)
 }
 
-func (r *ValidatorContext) Method() string {
+func (r *validatorContext) Method() string {
 	return r.c.Method()
 }
 
-func (r *ValidatorContext) BodyWriter() io.Writer {
+func (r *validatorContext) BodyWriter() io.Writer {
 	return r.c.BodyWriter()
 }
-func (r *ValidatorContext) Context() context.Context {
+func (r *validatorContext) Context() context.Context {
 	return r.c.Context()
-}
-
-// writeHumaError scrive un DefaultError sul context huma, per chi non passa da un handler.
-func writeHumaError(ctx huma.Context, status int, code, msg string) {
-	ctx.SetHeader("Content-Type", "application/json")
-	ctx.SetStatus(status)
-	b, err := json.Marshal(&DefaultError{Ambit: Ambit, Code: code, Message: msg})
-	if err != nil {
-		log.Error().Err(err).Str("code", code).Msg("serializzazione della risposta d'errore fallita")
-		return
-	}
-	if _, err := ctx.BodyWriter().Write(b); err != nil {
-		log.Warn().Err(err).Str("code", code).Msg("invio della risposta d'errore non completato")
-	}
 }

@@ -7,10 +7,46 @@
 ---
 
 Framework HTTP delle applicazioni GPA (package `coreapi`): router [chi v5](https://go-chi.io/),
-OpenAPI via [Huma v2](https://huma.rocks/), middleware autorizzativo RBAC, metriche e tracing,
-paginazione, Swagger UI, reverse proxy.
+OpenAPI via [Huma v2](https://huma.rocks/), metriche e tracing, paginazione, Swagger UI, reverse
+proxy. L'autorizzazione sta in [`go-core-auth`](../go-core-auth).
 
 Dipende da [`go-core-app`](../go-core-app). **Richiede Go 1.27+.**
+
+---
+
+## Struttura del modulo
+
+La radice `coreapi` tiene ciò che un'applicazione usa per wirare l'API e scrivere un'operazione;
+quello che l'app nomina per dominio sta in un package proprio, con **gli stessi nomi di simbolo**; i
+meccanismi (middleware, proxy, discovery) sono in `internal/` e non fanno parte della superficie.
+
+| Package | Contenuto |
+|---|---|
+| `coreapi` | `Module`, `Option`, `WithRoutes`, `WithModes`; `Router`, `RegisterWithBusiness`, `DefaultResponses`, `ApiRegistry`, `SerializeSchema`; `Config` coi sottotipi (`OpenApiConfig`, `Server`, `ProxyConfig`, `Header`) e i `Default*`; errori (`ManageBusinessError`, `DefaultError`, `ErrorContent`, `Ambit`, `Code*`); gli alias huma (`Operation`, `Response`, …) |
+| `coreapi/paging` | `PagingRequest`, `PagedResponse[T]`, `GeneratePageResponse` |
+| `coreapi/capability` | `CapabilityEntry`, `Capabilities(api)`, `CapabilityID`, `RegisterActionCapability` |
+| `internal/errors` | forma del body d'errore e codici (riesportati dalla radice come alias) |
+| `internal/middleware` | metriche, tracing, validator dei tag `validate:`, recover e limite al body |
+| `internal/proxy` | reverse proxy delle voci `proxy:` |
+| `internal/opem` | endpoint di discovery di develop-mode (`/capabilities*`, `/acl.mongo.js`, `/acl.sql`) |
+| `internal/swagger` | pagina `/openapi` |
+
+Nessun package importa la radice: è lei a comporli. `DefaultError`, `ProxyConfig` e `Header` sono
+**alias** dei tipi interni, quindi lo schema OpenAPI si chiama ancora `DefaultError` e lo YAML di
+`proxy:` è invariato. Il nome `paging` e non `page` è voluto: i file che lo usano importano anche
+`go-core-app/page` (per `page.Paging`).
+
+### Migrazione dal package piatto
+
+| Prima | Dopo |
+|---|---|
+| `coreapi.PagingRequest`, `PagedResponse`, `GeneratePageResponse` | `paging.*` (`…/go-core-api/paging`) |
+| `coreapi.CapabilityEntry`, `Capabilities`, `CapabilityID`, `RegisterActionCapability` | `capability.*` (`…/go-core-api/capability`) |
+| `coreapi.WithBusiness` | rimosso: `RegisterWithBusiness` è l'unico sito di registrazione |
+| `coreapi.MetricsReporter`, `MetricsContext`, `ValidatorContext`, `Router.ValidatorHandler`, `NewReverseProxy`, package `swagger` | rimossi dalla superficie (in `internal/`): il Module li monta da sé |
+
+Il resto della radice è invariato. Un'app che importa go-core-api con alias (`api "…/go-core-api"`)
+cambia solo i selettori della tabella.
 
 ---
 
@@ -205,24 +241,24 @@ volta sola per processo, anche con più router.
 
 ```go
 type listInput struct {
-    coreapi.PagingRequest              // ?pagesize= &pagenumber= &sort=
+    paging.PagingRequest               // ?pagesize= &pagenumber= &sort=
     Status string `query:"status"`
 }
 
-type listOutput = coreapi.PagedResponse[models.Person]
+type listOutput = paging.PagedResponse[models.Person]
 
 func list(ctx context.Context, in *listInput, b bizperson.IBusiness) (*listOutput, error) {
     sort, appErr := in.GetSort()          // "name:asc,createdAt:desc" -> page.SortRequest
     if appErr != nil {
         return nil, coreapi.ManageBusinessError(appErr)
     }
-    paging := page.InitPaging(nil, in.PageSize, in.PageNumber, 0)
+    pg := page.InitPaging(nil, in.PageSize, in.PageNumber, 0)
 
-    items, appErr := b.List(ctx, in.Status, sort, paging)
+    items, appErr := b.List(ctx, in.Status, sort, pg)
     if appErr != nil {
         return nil, coreapi.ManageBusinessError(appErr)
     }
-    return coreapi.GeneratePageResponse(items, paging), nil
+    return paging.GeneratePageResponse(items, pg), nil
 }
 ```
 
@@ -262,7 +298,7 @@ handler, identità e ruoli si leggono con gli accessor di `apiauth` (`UserFrom`,
 
 ### Capabilities
 
-`coreapi.RegisterActionCapability(id, description)` dichiara una capability non legata a una rotta.
+`capability.RegisterActionCapability(id, description)` dichiara una capability non legata a una rotta.
 In `develop-mode` il server espone gli endpoint di discovery, utili per generare il seed dell'ACL:
 
 | Path | Contenuto |
@@ -336,7 +372,7 @@ e la richiesta che l'ha causato: prima net/http chiudeva la connessione, e il cl
 risposta vuota senza che nulla finisse nelle metriche. `http.ErrAbortHandler`, con cui un handler o il
 reverse proxy interrompono apposta una risposta, viene rilanciato.
 
-**Il `ValidatorHandler`** (i tag `validate:` del body) salta i body il cui schema non ha un tipo con
+**Il validator** (`internal/middleware`, i tag `validate:` del body) salta i body il cui schema non ha un tipo con
 nome — un array o un tipo inline al top-level, che prima lo facevano panicare — e lascia a huma la
 validazione dello schema; un body che non si riesce a leggere per intero ferma la richiesta (413 o
 `API-BODY-READ` 400) invece di arrivare all'handler troncato.

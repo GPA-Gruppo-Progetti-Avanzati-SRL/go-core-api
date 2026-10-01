@@ -1,4 +1,4 @@
-package coreapi
+package proxy
 
 import (
 	"io"
@@ -50,7 +50,7 @@ func TestReverseProxy_BackendHTTPS(t *testing.T) {
 	http.DefaultTransport = backend.Client().Transport
 	defer func() { http.DefaultTransport = orig }()
 
-	h, err := NewReverseProxy(&ProxyConfig{
+	h, err := New(&Config{
 		MountPath: "/legacy", Url: backend.URL, Headers: []*Header{{Key: "X-Extra", Value: "v"}},
 	})
 	if err != nil {
@@ -72,7 +72,7 @@ func TestReverseProxy_BackendCheNonRisponde(t *testing.T) {
 	defer backend.Close()
 	defer close(release)
 
-	h, err := NewReverseProxy(&ProxyConfig{
+	h, err := New(&Config{
 		MountPath: "/legacy", Url: strings.TrimPrefix(backend.URL, "http://"),
 		ResponseHeaderTimeout: 50 * time.Millisecond,
 	})
@@ -91,7 +91,7 @@ func TestReverseProxy_BackendCheNonRisponde(t *testing.T) {
 }
 
 func TestReverseProxy_UrlNonValidoFermaLAvvio(t *testing.T) {
-	if _, err := NewReverseProxy(&ProxyConfig{MountPath: "/x", Url: "ftp://legacy"}); err == nil {
+	if _, err := New(&Config{MountPath: "/x", Url: "ftp://legacy"}); err == nil {
 		t.Fatal("atteso errore")
 	}
 }

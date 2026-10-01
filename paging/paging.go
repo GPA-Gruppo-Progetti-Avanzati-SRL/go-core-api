@@ -1,6 +1,9 @@
-package coreapi
+// Package paging contiene i tipi di richiesta e risposta paginata delle operazioni huma: i parametri
+// in query (PagingRequest) e gli header della pagina (PagedResponse), costruiti da page.Paging.
+package paging
 
 import (
+	apierrors "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/errors"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/page"
 )
@@ -26,7 +29,7 @@ type PagingRequest struct {
 func (p *PagingRequest) GetSort() (page.SortRequest, *core.Error) {
 	s, err := page.ParseSort(p.Sort)
 	if err != nil {
-		return nil, core.BusinessError().WithAmbit(Ambit).WithCode(CodeSort).WithCause(err)
+		return nil, core.BusinessError().WithAmbit(apierrors.Ambit).WithCode(apierrors.CodeSort).WithCause(err)
 	}
 	return s, nil
 }

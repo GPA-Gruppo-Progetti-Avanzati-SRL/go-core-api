@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/middleware"
+	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-api/internal/proxy"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/httpx"
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app/observability"
 	"github.com/go-chi/chi/v5"
@@ -18,14 +20,14 @@ func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) (*chi.Mux, error
 
 	// In testa, prima di qualsiasi rotta (chi non accetta un Use dopo): valgono per tutto ciò che
 	// il server serve, proxy compresi. Il recover è il più esterno, così copre anche il limite.
-	mux.Use(recoverer, limitBody(orDefault(cfg.MaxBodyBytes, DefaultMaxBodyBytes)))
+	mux.Use(middleware.Recoverer, middleware.LimitBody(orDefault(cfg.MaxBodyBytes, DefaultMaxBodyBytes)))
 
 	for _, pc := range cfg.Proxy {
-		proxy, err := NewReverseProxy(pc)
+		h, err := proxy.New(pc)
 		if err != nil {
 			return nil, err
 		}
-		mux.Mount(pc.MountPath, proxy)
+		mux.Mount(pc.MountPath, h)
 	}
 	srv := &http.Server{
 		Addr:              server,
