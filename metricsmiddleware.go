@@ -19,7 +19,7 @@ type MetricsReporter struct {
 
 func (m *MetricsReporter) MetricsHandler(ctx huma.Context, next func(huma.Context)) {
 
-	mc := &MetricsContext{c: ctx, w: &middlewareResponseWriter{rw: (ctx.BodyWriter()).(http.ResponseWriter)}}
+	mc := &MetricsContext{c: ctx, w: &middlewareResponseWriter{w: ctx.BodyWriter()}}
 
 	m.Middleware.Measure("", mc, func() {
 		next(mc)
@@ -121,22 +121,40 @@ func (r *MetricsContext) Context() context.Context {
 	return r.c.Context()
 }
 
+// middlewareResponseWriter conta i byte scritti nel body, per la metrica della dimensione della
+// risposta. Avvolge il BodyWriter di huma, che è un io.Writer: prima lo si convertiva a
+// http.ResponseWriter con una type assertion senza ok, e un adapter huma con un writer di altro
+// tipo faceva panicare ogni richiesta dentro il middleware delle metriche.
 type middlewareResponseWriter struct {
-	rw     http.ResponseWriter
+	w      io.Writer
 	Length int64
 }
 
 func (crw *middlewareResponseWriter) Header() http.Header {
-	return crw.rw.Header()
+	if rw, ok := crw.w.(http.ResponseWriter); ok {
+		return rw.Header()
+	}
+	return http.Header{}
 }
 
 func (crw *middlewareResponseWriter) WriteHeader(status int) {
-	crw.rw.WriteHeader(status)
+	if rw, ok := crw.w.(http.ResponseWriter); ok {
+		rw.WriteHeader(status)
+	}
 }
 
 func (crw *middlewareResponseWriter) Write(p []byte) (int, error) {
-
-	n, err := crw.rw.Write(p)
+	n, err := crw.w.Write(p)
 	crw.Length += int64(n)
 	return n, err
 }
+
+// Flush e Unwrap tengono raggiungibili le capacità del writer avvolto: senza, una risposta in
+// streaming (SSE) che chiede il flush al BodyWriter lo perde dietro questo wrapper.
+func (crw *middlewareResponseWriter) Flush() {
+	if f, ok := crw.w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (crw *middlewareResponseWriter) Unwrap() io.Writer { return crw.w }

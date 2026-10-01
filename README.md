@@ -188,9 +188,16 @@ come le altre.
 func ManageBusinessError(e *core.Error) error
 ```
 
-Traduce l'`ApplicationError` di go-core-app nella error response Huma, con lo status del `StatusCode`
-e il body `DefaultError` (`ambit`, `code`, `message`). La causa non esportata **non** finisce nel
-body: `encoding/json` ignora i campi non esportati.
+Traduce il `core.Error` di go-core-app nella error response Huma, con lo status del `StatusCode`
+— **qualunque** status d'errore (prima solo 400/404/422/500 passavano, e un 409 o un 403 diventavano un
+500 "Errore Sconosciuto"); uno status fuori da 400..599 vale 500 — e il body `DefaultError` (`ambit`,
+`code`, `message`). La causa non esportata **non** finisce nel body: `encoding/json` ignora i campi non
+esportati.
+
+Gli errori di **validazione della richiesta** di huma (il suo 422) escono come **400 `ERR-VALIDATION`**,
+ed è voluto: 400 è un input malformato, 422 resta lo status degli errori di business
+(`core.BusinessError`), e i due casi chiedono al client cose diverse. La conversione si installa una
+volta sola per processo, anche con più router.
 
 ---
 
@@ -349,6 +356,12 @@ Il modulo avvia il server sulla porta configurata ed espone, oltre alle rotte de
 > sulla porta dell'API.
 
 Ogni richiesta passa per il middleware di metriche, quello di tracing OTel e il validatore.
+
+Lo span porta metodo, route e status, più **una lista chiusa di header** (`content-type`, `accept`,
+`user-agent`, `x-request-id`, `x-forwarded-for`, come `http.request.header.*`): prima ci finivano
+**tutti**, quindi `Authorization`, `Cookie` e i token applicativi arrivavano in chiaro al backend di
+tracing. Lo span è in errore solo sui **5xx**: un 4xx è una risposta corretta a una richiesta
+sbagliata (prima ogni status ≥ 300 lo marcava in errore).
 Lo shutdown è agganciato al lifecycle fx (`srv.Shutdown` in `OnStop`).
 
 ### Reverse proxy

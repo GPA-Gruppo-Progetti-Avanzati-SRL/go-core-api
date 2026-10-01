@@ -2,6 +2,8 @@ package coreapi
 
 import (
 	"errors"
+	"net/http"
+	"sync"
 
 	"github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"github.com/danielgtaylor/huma/v2"
@@ -21,20 +23,17 @@ const (
 	CodeBodyRead     = "API-BODY-READ"      // 400: body della richiesta non leggibile
 )
 
+// ManageBusinessError converte un *core.Error nella risposta d'errore huma, con lo status del
+// core.Error. Prima conosceva solo 400/404/422/500 e ogni altro status — un 409 di conflitto, un 403
+// applicativo — diventava un 500 "Errore Sconosciuto", cioè un guasto del server per una risposta
+// corretta. Uno status che non è un errore HTTP (fuori da 400..599) resta un 500: un core.Error che
+// arrivi qui con 200 è un difetto di chi l'ha costruito.
 func ManageBusinessError(e *core.Error) error {
-
-	switch e.StatusCode {
-	case 400:
-		return huma.Error400BadRequest(e.Message, e)
-	case 404:
-		return huma.Error404NotFound(e.Message, e)
-	case 422:
-		return huma.Error422UnprocessableEntity(e.Message, e)
-	case 500:
-		return huma.Error500InternalServerError(e.Message, e)
-	default:
-		return huma.Error500InternalServerError("Errore Sconosciuto", e)
+	status := e.StatusCode
+	if status < 400 || status > 599 {
+		status = http.StatusInternalServerError
 	}
+	return huma.NewError(status, e.Message, e)
 }
 
 var ErrorContent = map[string]*MediaType{ApplicationJson: {
@@ -56,7 +55,20 @@ func (e *DefaultError) GetStatus() int {
 	return e.Status
 }
 
+// configureErrorOnce: huma.NewError è una variabile di package, e configureError la avvolge. Senza
+// Once ogni newRouter avvolgeva la versione già avvolta — con più router nello stesso processo, o in
+// ogni test, la catena cresceva a ogni costruzione.
+var configureErrorOnce sync.Once
+
+// configureError sostituisce huma.NewError, una sola volta per processo: un *core.Error diventa un
+// DefaultError col suo status, e gli errori di validazione della richiesta (422 di huma) diventano un
+// 400 ERR-VALIDATION. È voluto: 400 è un input malformato, 422 resta lo status degli errori di
+// business (core.BusinessError) — i due casi hanno un client diverso da cui farsi aggiustare.
 func configureError() {
+	configureErrorOnce.Do(installErrorHandler)
+}
+
+func installErrorHandler() {
 	orig := huma.NewError
 	huma.NewError = func(status int, message string, errs ...error) huma.StatusError {
 		if len(errs) > 0 {
@@ -64,8 +76,14 @@ func configureError() {
 			var ev *core.Error
 			switch {
 			case errors.As(err, &ev):
+				// Lo status del core.Error vince, ma solo se è uno status d'errore: un core.Error
+				// costruito con 0 o 200 farebbe uscire una risposta d'errore con un 200.
+				st := ev.StatusCode
+				if st < 400 || st > 599 {
+					st = status
+				}
 				return &DefaultError{
-					Status:  ev.StatusCode,
+					Status:  st,
 					Ambit:   ev.Ambit,
 					Code:    ev.Code,
 					Message: ev.Message,

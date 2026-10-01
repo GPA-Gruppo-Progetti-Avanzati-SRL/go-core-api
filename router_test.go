@@ -2,7 +2,9 @@ package coreapi
 
 import (
 	"context"
+
 	"encoding/json"
+	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -261,4 +263,21 @@ func TestPprofSoloInDevelopMode(t *testing.T) {
 			assert.Equal(t, http.StatusOK, rr.Code, "GET %s deve essere servito in develop-mode", p)
 		}
 	})
+}
+
+// Lo status del core.Error arriva al client qualunque sia: prima solo 400/404/422/500 passavano, e un
+// 409 o un 403 dell'applicazione diventavano un 500 "Errore Sconosciuto".
+func TestManageBusinessError_ConservaLoStatus(t *testing.T) {
+	_ = newRouter(chi.NewRouter(), &Config{}) // installa la conversione degli errori
+	for status, want := range map[int]int{409: 409, 403: 403, 422: 422, 404: 404, 200: 500, 0: 500} {
+		ce := core.BusinessError().WithCode("X")
+		ce.StatusCode = status
+		var se huma.StatusError
+		require.ErrorAs(t, ManageBusinessError(ce), &se)
+		assert.Equal(t, want, se.GetStatus(), "status %d", status)
+	}
+	// newRouter due volte non avvolge due volte huma.NewError.
+	_ = newRouter(chi.NewRouter(), &Config{})
+	assert.Equal(t, 422, huma.NewError(409, "x", core.BusinessError().WithCode("X")).GetStatus(),
+		"lo status è quello del core.Error, non quello passato a NewError")
 }

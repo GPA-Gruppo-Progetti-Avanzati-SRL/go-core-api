@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"unicode"
 
 	core "github.com/GPA-Gruppo-Progetti-Avanzati-SRL/go-core-app"
@@ -44,12 +45,18 @@ type capDefDoc struct {
 	SysInfo     string `json:"sys_info"`
 }
 
-// actionCapabilities raccoglie le capability action_api registrate dall'applicazione.
-var actionCapabilities []CapabilityEntry
+// actionCapabilities raccoglie le capability action_api registrate dall'applicazione. Il mutex c'è
+// perché la registrazione e la lettura (GET /capabilities) possono incontrarsi a runtime.
+var (
+	actionCapabilitiesMu sync.Mutex
+	actionCapabilities   []CapabilityEntry
+)
 
 // RegisterActionCapability registra una capability action_api inclusa nella risposta
 // di GET /capabilities. Chiamare durante l'inizializzazione dell'applicazione.
 func RegisterActionCapability(id, description string) {
+	actionCapabilitiesMu.Lock()
+	defer actionCapabilitiesMu.Unlock()
 	actionCapabilities = append(actionCapabilities, CapabilityEntry{
 		ID:          id,
 		Category:    "action_api",
@@ -300,7 +307,9 @@ func Capabilities(api huma.API) []CapabilityEntry {
 		}
 	}
 
+	actionCapabilitiesMu.Lock()
 	entries = append(entries, actionCapabilities...)
+	actionCapabilitiesMu.Unlock()
 	return entries
 }
 
