@@ -1,24 +1,17 @@
 # Codici di errore — go-core-api
 
-`go-core-api` è soprattutto **il punto in cui l'`ApplicationError` diventa una risposta HTTP**:
+`go-core-api` è soprattutto **il punto in cui il `core.Error` diventa una risposta HTTP**:
 la maggior parte dei codici che il client vede arriva dai layer sottostanti (business,
-`go-core-mongo`, `go-core-sql`, `go-core-app`), che dichiarano il proprio `Ambit`.
+`go-core-mongo`, `go-core-sql`, `go-core-app`, `go-core-auth`), che dichiarano il proprio `Ambit`.
 
 > **`Ambit` dice da quale libreria viene l'errore.** Quelli emessi qui portano
-> `Ambit = "go-core-api"` (costante `coreapi.Ambit`); nel sottopackage `authorization` la
-> costante è ripetuta (`ambit`) perché quel package non importa il root.
+> `Ambit = "go-core-api"` (costante `coreapi.Ambit`, definita in `internal/errors` e riesportata).
 
 ## Mapping core.Error → risposta HTTP
 
-`ManageBusinessError(e *core.Error) error` (`error.go:19`) traduce lo status:
-
-| `StatusCode` | Risposta Huma |
-|---|---|
-| 400 | `huma.Error400BadRequest` |
-| 404 | `huma.Error404NotFound` |
-| 422 | `huma.Error422UnprocessableEntity` |
-| 500 | `huma.Error500InternalServerError` |
-| altro | `huma.Error500InternalServerError` con messaggio `Errore Sconosciuto` |
+`ManageBusinessError(e *core.Error) error` (`error.go`) usa **lo status del `core.Error`**, qualunque
+esso sia (409, 403, 413, …). Uno status fuori da 400..599 — un `core.Error` costruito con 200 —
+diventa 500, perché è un difetto di chi l'ha costruito.
 
 Il body è sempre un `DefaultError`:
 
@@ -39,19 +32,11 @@ e il **suo** status. Il campo `cause` è non esportato: nel JSON non compare mai
 | `API-BODY-TOO-LARGE` | 413 | `coreapi.CodeBodyTooLarge` | `internal/middleware/validator.go` (`Validator`) | body oltre `max-body-bytes` |
 | `API-BODY-READ` | 400 | `coreapi.CodeBodyRead` | `internal/middleware/validator.go` (`Validator`) | body della richiesta non leggibile per intero (connessione interrotta) |
 | `ERR_VALIDATION` | **400** | `core.ErrValidation` | `error.go` (`installErrorHandler`) | validazione della richiesta fatta da huma (422 in ingresso) riscritta con **status 400**; il messaggio unisce quello di huma e gli errori di campo |
-| `API-FORBIDDEN` | 403 | `authorization.CodeForbiddenRole` | `authorization/middleware.go:135` | nessuno dei ruoli presentati abilita la rotta |
-| `API-CTX-FORBIDDEN` | 403 | `authorization.CodeForbiddenCtx` | `authorization/middleware.go:139` | il context header non è autorizzato |
-| `API-TOKEN-CRYPT` | 500 | `authorization.CodeTokenEncryption` | `authorization/token.go:112` | cifratura del token fallita; l'errore di `utils.Encrypt` è la causa |
 
-### Cambiamenti rispetto al censimento precedente
-
-- **I due 403 avevano un body tutto loro** (`{"error":"forbidden","message":"..."}`): erano le
-  uniche risposte d'errore dell'API senza `code`, e nessun client poteva trattarle come le
-  altre. Ora escono nella stessa forma `ambit`/`code`/`message` del `DefaultError`.
-- **L'errore di cifratura del token** era un `huma.Error500InternalServerError` nudo: nessun
-  codice, ambit vuoto. Ora è un `ApplicationError` con `API-TOKEN-CRYPT`.
-- L'ambit della validazione huma era la stringa `"VALIDATION"`; ora è `go-core-api`, e a dire
-  che si tratta di validazione resta il codice.
+I 403 dell'autorizzazione e l'errore di cifratura del token **non sono più di questo modulo**:
+il middleware vive in `go-core-auth/apiauth` e i codici sono `AUTH-FORBIDDEN`,
+`AUTH-CTX-FORBIDDEN`, `AUTH-TOKEN-CRYPT` (vedi `go-core-auth/ERRORI.md`). Escono comunque nella
+forma `DefaultError`, perché passano dallo stesso handler d'errore.
 
 ## Risposte d'errore dichiarate nell'OpenAPI
 

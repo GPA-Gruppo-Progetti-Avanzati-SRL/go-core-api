@@ -25,10 +25,10 @@ func WithModes(modes ...string) Option {
 // grafo (l'app la fornisce come sempre con core.ProvideAs[B]). Un business non provveduto
 // fa fallire l'avvio con un "missing type" di fx, mai un nil silenzioso.
 //
-//	apiservices.Module(&cfg.ApiConfig,
-//	    apiservices.WithRoutes(routeperson.Register),   // func(*Router, bizperson.IBusiness)
-//	    apiservices.WithRoutes(routeorder.Register),
-//	    apiservices.WithModes(engine.Api),
+//	coreapi.Module(&svc.Api,
+//	    coreapi.WithRoutes(routeperson.Register),   // func(*Router, bizperson.IBusiness)
+//	    coreapi.WithRoutes(routeorder.Register),
+//	    coreapi.WithModes(engine.Api),
 //	)
 //
 // Servono più dipendenze (o due istanze dello stesso tipo di interfaccia) in un solo sito?

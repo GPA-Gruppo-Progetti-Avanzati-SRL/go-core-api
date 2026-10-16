@@ -230,7 +230,7 @@ Traduce il `core.Error` di go-core-app nella error response Huma, con lo status 
 `code`, `message`). La causa non esportata **non** finisce nel body: `encoding/json` ignora i campi non
 esportati.
 
-Gli errori di **validazione della richiesta** di huma (il suo 422) escono come **400 `ERR-VALIDATION`**,
+Gli errori di **validazione della richiesta** di huma (il suo 422) escono come **400 `ERR_VALIDATION`**,
 ed è voluto: 400 è un input malformato, 422 resta lo status degli errori di business
 (`core.BusinessError`), e i due casi chiedono al client cose diverse. La conversione si installa una
 volta sola per processo, anche con più router.

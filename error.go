@@ -54,7 +54,7 @@ var configureErrorOnce sync.Once
 
 // configureError sostituisce huma.NewError, una sola volta per processo: un *core.Error diventa un
 // DefaultError col suo status, e gli errori di validazione della richiesta (422 di huma) diventano un
-// 400 ERR-VALIDATION. È voluto: 400 è un input malformato, 422 resta lo status degli errori di
+// 400 ERR_VALIDATION. È voluto: 400 è un input malformato, 422 resta lo status degli errori di
 // business (core.BusinessError) — i due casi hanno un client diverso da cui farsi aggiustare.
 func configureError() {
 	configureErrorOnce.Do(installErrorHandler)
