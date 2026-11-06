@@ -15,6 +15,14 @@ import (
 )
 
 func newService(lc fx.Lifecycle, sh fx.Shutdowner, cfg *Config) (*chi.Mux, error) {
+	// Il /metrics di questo server serve il registry di default, quindi è anche il posto delle
+	// metriche OTel: senza provider sarebbero no-op. Nel costruttore e non in OnStart, così il
+	// provider c'è prima che le librerie creino i propri strumenti nei loro OnStart (quelli creati
+	// prima li inoltra comunque il provider globale di otel). Idempotente con NewServerMetrics.
+	if err := observability.InitMeterProvider(); err != nil {
+		return nil, err
+	}
+
 	mux := chi.NewRouter()
 	server := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 
